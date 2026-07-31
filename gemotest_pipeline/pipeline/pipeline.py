@@ -75,8 +75,8 @@ def run_block_search_first(analysis: str, block_id: int, model: str) -> dict:
     queries = [q.format(analysis=analysis) for q in block.get("search_queries", [])]
     print(f"[search-first] Запросы: {queries}")
 
-    # Step 2 — Serper search + Tavily extract
-    sources = search_and_extract(queries, max_urls=3)
+    # Step 2 — Serper (10 results/query) → top 3 per query → Tavily batch
+    sources = search_and_extract(queries, results_per_query=10, urls_per_query=3)
     print(f"[search-first] Источников: {len(sources)}")
 
     total_usage: dict = {}

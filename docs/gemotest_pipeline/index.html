@@ -682,7 +682,7 @@ function renderResult(data) {
             : '';
           return `<details style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
             <summary style="cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;list-style:none;display:flex;align-items:center;gap:6px">
-              ▸ Поиск · ${(b.search_results||[]).length} страниц
+              ▸ Поиск · ${b.search_queries.length} запроса × 3 = ${(b.search_results||[]).length} страниц
             </summary>
             <div style="margin-top:8px">
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px">Serper-запросы</div>
