@@ -654,16 +654,9 @@ function renderResult(data) {
       : `<span class="chip chip-warn">⚠ не верифицировано</span>`;
     if (b.verified) blocksVerified++;
 
-    const sourcesHtml = b.verified && b.sources && b.sources.length
-      ? `<div class="verify-section">
-           <div class="verify-label">● Верифицировано · ${b.sources.length} источников</div>
-           ${b.sources.map(s => `<div class="source-item"><a href="${esc(s)}" target="_blank">${esc(s.length > 90 ? s.slice(0,90)+'…' : s)}</a></div>`).join('')}
-         </div>`
-      : '';
-
     const warningsHtml = (b.warnings || []).map(w => `<div class="warning-item">${esc(w)}</div>`).join('');
 
-    // Search details collapsible (for search-first blocks)
+    // Search details collapsible (for search-first blocks) — sources included inside
     const searchHtml = b.search_queries && b.search_queries.length
       ? (() => {
           const qHtml = b.search_queries.map(q =>
@@ -681,6 +674,12 @@ function renderResult(data) {
                  <div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.5">${esc(b.extracted_facts)}</div>
                </div>`
             : '';
+          const sourcesInner = b.sources && b.sources.length
+            ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+                 <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px">● Верифицировано · ${b.sources.length} источников</div>
+                 ${b.sources.map(s => `<div style="margin-top:3px"><a href="${esc(s)}" target="_blank" style="font-size:12px;color:var(--blue);word-break:break-all">${esc(s.length > 90 ? s.slice(0,90)+'…' : s)}</a></div>`).join('')}
+               </div>`
+            : '';
           return `<details style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
             <summary style="cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;list-style:none;display:flex;align-items:center;gap:6px">
               ▸ Поиск · ${b.search_queries.length} запроса × 3 = ${(b.search_results||[]).length} страниц
@@ -691,10 +690,16 @@ function renderResult(data) {
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:8px;margin-bottom:4px">Страницы</div>
               ${srHtml}
               ${factsHtml}
+              ${sourcesInner}
             </div>
           </details>`;
         })()
-      : '';
+      : b.sources && b.sources.length
+        ? `<div class="verify-section">
+             <div class="verify-label">● Верифицировано · ${b.sources.length} источников</div>
+             ${b.sources.map(s => `<div class="source-item"><a href="${esc(s)}" target="_blank">${esc(s.length > 90 ? s.slice(0,90)+'…' : s)}</a></div>`).join('')}
+           </div>`
+        : '';
 
     const card = document.createElement('div');
     card.className = 'block-card';
@@ -706,7 +711,7 @@ function renderResult(data) {
         ${vChip}
       </div>
       <div class="block-content">${renderContent(b.content || '')}</div>
-      ${sourcesHtml}${warningsHtml}${searchHtml}
+      ${warningsHtml}${searchHtml}
     `;
     section.appendChild(card);
   });

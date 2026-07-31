@@ -46,7 +46,7 @@ def tavily_extract(urls: list[str]) -> list[dict]:
     for item in data.get("results", []):
         out.append({
             "url":     item.get("url", ""),
-            "content": item.get("raw_content", "")[:4000],
+            "content": item.get("raw_content", "")[:8000],
         })
     return out
 
