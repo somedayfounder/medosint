@@ -28,20 +28,6 @@ def slugify(s: str) -> str:
 SEARCH_FIRST_BLOCKS = {44}
 
 
-def _generate_search_queries(analysis: str, block: dict, model: str) -> list[str]:
-    """Ask Flash to generate 1-3 search queries for a block."""
-    prompt = (
-        f"Для анализа «{analysis}» нужно найти информацию для блока «{block['name']}».\n"
-        f"Описание блока: {block['description']}\n\n"
-        f"Сформулируй 1-3 поисковых запроса для Google (по-русски и/или по-английски), "
-        f"которые найдут релевантные медицинские страницы.\n"
-        f"Верни только список запросов — по одному на строку, без нумерации и маркеров."
-    )
-    raw, _ = call_gemini(prompt, model)
-    queries = [q.strip('•-– ') for q in raw.strip().splitlines() if q.strip()]
-    return queries[:3]
-
-
 def _generate_block_from_sources(analysis: str, block: dict, sources: list[dict], model: str) -> tuple[str, dict]:
     """Ask Flash to write a block from web sources."""
     web_ctx = "\n\n".join(
@@ -65,9 +51,8 @@ def run_block_search_first(analysis: str, block_id: int, model: str) -> dict:
     block = BLOCKS[block_id]
     print(f"[search-first] Блок {block_id}: {block['name']}")
 
-    # Step 1 — generate queries
-    print("[search-first] Генерируем запросы…")
-    queries = _generate_search_queries(analysis, block, model)
+    # Step 1 — queries from block config
+    queries = [q.format(analysis=analysis) for q in block.get("search_queries", [])]
     print(f"[search-first] Запросы: {queries}")
 
     # Step 2 — search + extract
