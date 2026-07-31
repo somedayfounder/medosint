@@ -521,7 +521,7 @@ async function triggerWorkflow(inputs) {
       body: JSON.stringify(inputs),
     });
     const text = await r.text();
-    addLog('info', `Worker: HTTP ${r.status} → ${text.slice(0, 200)}`);
+    addLog('info', `Worker: HTTP ${r.status} → ${text.slice(0, 800)}`);
     if (!r.ok) return false;
     const d = JSON.parse(text);
     return d.ok === true;
