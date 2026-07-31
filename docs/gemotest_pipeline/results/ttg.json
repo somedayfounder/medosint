@@ -1,7 +1,7 @@
 {
   "analysis": "ттг",
   "slug": "ttg",
-  "generated_at": "2026-07-31T10:49:25.831656Z",
+  "generated_at": "2026-07-31T10:56:22.289163Z",
   "blocks": {
     "44": {
       "id": 44,
@@ -9,35 +9,89 @@
       "section": "b2c",
       "pass_group": 1,
       "format": "prose",
-      "content": "Проверьте работу щитовидной железы: выявляет гипотиреоз, гипертиреоз и причину хронической усталости.",
+      "content": "Оцените работу щитовидной железы — выявите гипотиреоз, гипертиреоз и сбои метаболизма на ранней стадии.",
       "confidence": "high",
       "needs_verify": false,
       "verified": true,
       "sources": [
         "https://www.invitro.ru/library/labdiagnostika/23837/",
         "https://dc-apex.ru/blog/zachem-sdavat-ttg/",
-        "https://zdorovie-vn.ru/diagnostika/analizyi/analiz-na-ttg"
+        "https://zdorovie-vn.ru/diagnostika/analizyi/analiz-na-ttg",
+        "https://www.apollohospitals.com/ru/diagnostics-investigations/tsh-test",
+        "https://skmed-mc.ru/articles/laboratornye-issledovaniya-/analiz-krovi-na-ttg-tablitsa-norm-u-zhenshchin-po-vozrastu-rasshifrovka-rezultatov/",
+        "https://kdl.ru/analizy-i-tseny/msk/ttg-tireotropniy-gormon",
+        "https://nmtmed.ru/patsientam/stati/item/946-analoz-ttg-nmt",
+        "https://gemotest.ru/rezh/catalog/issledovaniya-krovi/gormony/funktsiya-shchitovidnoy-zhelezy/ttg/",
+        "https://citilab.ru/articles/kak-sdavat-ttg/"
       ],
-      "warnings": [],
-      "fact_cards": [],
-      "verify_queries": [],
-      "_search_queries": [
+      "search_queries": [
         "ттг показания когда назначают кому нужно сдать",
         "ттг что выявляет какие заболевания диагностирует",
         "ттг зачем сдавать польза скрининг"
-      ]
+      ],
+      "search_results": [
+        {
+          "url": "https://www.invitro.ru/library/labdiagnostika/23837/",
+          "title": "ТТГ, тиреотропный гормон",
+          "snippet": "Анализ на ТТГ необходимо сдавать утром, после полноценного сна. За три дня до исследования необходимо отказаться от приема алкоголя, жирной и ..."
+        },
+        {
+          "url": "https://dc-apex.ru/blog/zachem-sdavat-ttg/",
+          "title": "Зачем сдавать ТТГ и когда это нужно делать",
+          "snippet": "Зачем сдавать ТТГ? · резкая, немотивированная потеря массы тела; · учащенное сердцебиение (тахикардия), ощущение перебоев в работе сердца; ..."
+        },
+        {
+          "url": "https://zdorovie-vn.ru/diagnostika/analizyi/analiz-na-ttg",
+          "title": "Анализ на ТТГ【тиреотропный гормон】- расшифровка и ...",
+          "snippet": "Показания к сдаче анализа на ТТГ · подозрение на заболевания щитовидки; · расстройство репродуктивной функции; · бесплодие; · наличие ановуляторных циклов; ..."
+        },
+        {
+          "url": "https://www.apollohospitals.com/ru/diagnostics-investigations/tsh-test",
+          "title": "Тест на ТТГ — цель, результаты, нормальный диапазон ...",
+          "snippet": "Тест ТТГ измеряет уровень тиреотропного гормона в крови, помогая диагностировать и контролировать заболевания щитовидной железы. Он необходим для выявления ..."
+        },
+        {
+          "url": "https://skmed-mc.ru/articles/laboratornye-issledovaniya-/analiz-krovi-na-ttg-tablitsa-norm-u-zhenshchin-po-vozrastu-rasshifrovka-rezultatov/",
+          "title": "Норма ТТГ у женщин по возрасту: точная таблица + как ...",
+          "snippet": "Потеря веса при повышенном аппетите. · Тревожность, раздражительность, плаксивость. · Учащенное сердцебиение (тахикардия), ощущение перебоев в работе сердца."
+        },
+        {
+          "url": "https://kdl.ru/analizy-i-tseny/msk/ttg-tireotropniy-gormon",
+          "title": "ТТГ (тиреотропный гормон) в Москве и МО",
+          "snippet": "Сниженный уровень ТТГ чаще всего наблюдается при гипертиреозе. Болезнь Грейвса (диффузный токсический зоб) является наиболее распространенной причиной ..."
+        },
+        {
+          "url": "https://nmtmed.ru/patsientam/stati/item/946-analoz-ttg-nmt",
+          "title": "О чем расскажет анализ на ТТГ?",
+          "snippet": "Определение уровня ТТГ в крови очень важно для оценки работы эндокринной системы, потому что тиротропин - это основной регулятор работы щитовидной железы. ТТГ ..."
+        },
+        {
+          "url": "https://gemotest.ru/rezh/catalog/issledovaniya-krovi/gormony/funktsiya-shchitovidnoy-zhelezy/ttg/",
+          "title": "ТТГ в Реже",
+          "snippet": "Зачем сдавать этот анализ? Врач может направить пациента на анализ при симптомах гипертиреоза или гипотиреоза, при беременности или её планировании, а также ..."
+        },
+        {
+          "url": "https://citilab.ru/articles/kak-sdavat-ttg/",
+          "title": "Как правильно сдавать анализ крови на ТТГ",
+          "snippet": "Без рекомендации лечащего врача сдавать ТТГ необязательно, но это может быть полезным, если вы неожиданно начали набирать вес, заметили, что ..."
+        }
+      ],
+      "extracted_facts": "* Анализ крови на ТТГ (тиреотропный гормон) — ключевой метод оценки функции щитовидной железы и ранней диагностики её нарушений.\n* ТТГ вырабатывается гипофизом и регулирует выработку гормонов щитовидной железы, которые отвечают за обмен веществ, энергию и общее состояние организма.\n* Исследование помогает вовремя выявить такие состояния, как гипотиреоз и гипертиреоз, а также контролировать эффективность назначенного лечения.",
+      "warnings": [],
+      "fact_cards": [],
+      "verify_queries": []
     }
   },
   "stats": {
     "blocks_total": 1,
     "blocks_filled": 1,
     "blocks_verified": 1,
-    "llm_cost_usd": 0.000362,
+    "llm_cost_usd": 0.000808,
     "llm_tokens": {
-      "prompt_tokens": 3958,
-      "completion_tokens": 216,
-      "total_tokens": 5802
+      "prompt_tokens": 10175,
+      "completion_tokens": 150,
+      "total_tokens": 12068
     },
-    "sources_used": 3
+    "sources_used": 9
   }
 }
