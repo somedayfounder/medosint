@@ -464,7 +464,7 @@ function initBlockChecklist() {
         ? `<button class="info-btn" data-id="${b.id}" onclick="showInfo(event,${b.id})" title="Описание блока">i</button>`
         : `<span style="width:16px;flex-shrink:0"></span>`;
       html += `<label style="display:flex;align-items:center;gap:6px;padding:4px 12px 4px 16px;cursor:pointer;font-size:13px;color:var(--text2);line-height:1.3">
-        <input type="checkbox" data-block="${b.id}" style="width:14px;height:14px;accent-color:var(--accent);flex-shrink:0" checked />
+        <input type="checkbox" data-block="${b.id}" style="width:14px;height:14px;accent-color:var(--accent);flex-shrink:0" />
         <span style="color:var(--muted);font-family:var(--mono);font-size:11px;flex-shrink:0;min-width:20px">${b.id}</span>
         <span style="flex:1">${esc(b.name)}</span>
         ${infoBtn}

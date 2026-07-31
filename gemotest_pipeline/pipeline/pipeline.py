@@ -165,24 +165,35 @@ def run(analysis: str, block_ids: list | None, model: str, out_dir: Path):
     print(f"[pipeline] Итого блоков: {len(all_blocks)}, стоимость: ${total_cost:.6f}")
 
     slug = slugify(analysis)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{slug}.json"
+
+    # Merge with existing result when running partial blocks
+    merged_blocks = {}
+    if block_ids and out_path.exists():
+        try:
+            existing = json.loads(out_path.read_text())
+            merged_blocks = {int(k): v for k, v in existing.get("blocks", {}).items()}
+            print(f"[pipeline] Мердж с существующим результатом ({len(merged_blocks)} блоков)")
+        except Exception as e:
+            print(f"[pipeline] Не удалось загрузить существующий результат: {e}")
+    merged_blocks.update(all_blocks)
+
     result = {
         "analysis":     analysis,
         "slug":         slug,
-        "model":        model,
         "generated_at": datetime.utcnow().isoformat() + "Z",
-        "blocks":       all_blocks,
+        "blocks":       merged_blocks,
         "stats": {
-            "blocks_total":    len(all_blocks),
-            "blocks_filled":   len(all_blocks),
-            "blocks_verified": sum(1 for b in all_blocks.values() if b.get("verified")),
+            "blocks_total":    len(merged_blocks),
+            "blocks_filled":   len(merged_blocks),
+            "blocks_verified": sum(1 for b in merged_blocks.values() if b.get("verified")),
             "llm_cost_usd":    round(total_cost, 6),
             "llm_tokens":      total_usage,
-            "sources_used":    sum(len(b.get("sources", [])) for b in all_blocks.values()),
+            "sources_used":    sum(len(b.get("sources", [])) for b in merged_blocks.values()),
         },
     }
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{slug}.json"
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2))
     print(f"[pipeline] Сохранено: {out_path}")
     return out_path
