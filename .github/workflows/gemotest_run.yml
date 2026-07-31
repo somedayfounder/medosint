@@ -37,7 +37,7 @@ jobs:
 
       - name: Run pipeline
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI }}
         run: |
           python -m gemotest_pipeline.pipeline.pipeline \
             --analysis "${{ inputs.analysis_name }}" \
