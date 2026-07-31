@@ -1,8 +1,7 @@
 {
   "analysis": "ттг",
   "slug": "ttg",
-  "model": "gemini-2.0-flash",
-  "generated_at": "2026-07-31T10:42:08.979393Z",
+  "generated_at": "2026-07-31T10:49:25.831656Z",
   "blocks": {
     "44": {
       "id": 44,
@@ -10,7 +9,7 @@
       "section": "b2c",
       "pass_group": 1,
       "format": "prose",
-      "content": "Проверьте функцию щитовидной железы — базовый тест для выявления гипотиреоза и гипертиреоза.",
+      "content": "Проверьте работу щитовидной железы: выявляет гипотиреоз, гипертиреоз и причину хронической усталости.",
       "confidence": "high",
       "needs_verify": false,
       "verified": true,
@@ -33,11 +32,11 @@
     "blocks_total": 1,
     "blocks_filled": 1,
     "blocks_verified": 1,
-    "llm_cost_usd": 0.000364,
+    "llm_cost_usd": 0.000362,
     "llm_tokens": {
-      "prompt_tokens": 4263,
-      "completion_tokens": 149,
-      "total_tokens": 5784
+      "prompt_tokens": 3958,
+      "completion_tokens": 216,
+      "total_tokens": 5802
     },
     "sources_used": 3
   }
