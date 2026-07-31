@@ -1,7 +1,7 @@
 {
   "analysis": "ттг",
   "slug": "ttg",
-  "generated_at": "2026-07-31T10:56:22.289163Z",
+  "generated_at": "2026-07-31T10:57:55.259414Z",
   "blocks": {
     "44": {
       "id": 44,
@@ -9,7 +9,7 @@
       "section": "b2c",
       "pass_group": 1,
       "format": "prose",
-      "content": "Оцените работу щитовидной железы — выявите гипотиреоз, гипертиреоз и сбои метаболизма на ранней стадии.",
+      "content": "Главный тест здоровья щитовидной железы — выявите причины усталости и скачков веса.",
       "confidence": "high",
       "needs_verify": false,
       "verified": true,
@@ -20,9 +20,9 @@
         "https://www.apollohospitals.com/ru/diagnostics-investigations/tsh-test",
         "https://skmed-mc.ru/articles/laboratornye-issledovaniya-/analiz-krovi-na-ttg-tablitsa-norm-u-zhenshchin-po-vozrastu-rasshifrovka-rezultatov/",
         "https://kdl.ru/analizy-i-tseny/msk/ttg-tireotropniy-gormon",
-        "https://nmtmed.ru/patsientam/stati/item/946-analoz-ttg-nmt",
-        "https://gemotest.ru/rezh/catalog/issledovaniya-krovi/gormony/funktsiya-shchitovidnoy-zhelezy/ttg/",
-        "https://citilab.ru/articles/kak-sdavat-ttg/"
+        "https://citilab.ru/articles/kak-sdavat-ttg/",
+        "https://gemotest.ru/info/ask/myths/mozhno-li-sdavat-ttg-pri-mesyachnykh/",
+        "https://analizi.spb.ru/specialization/analizy-na-gormony/analizy-na-gormony-shhitovidnoj-zhelezy/analiz-na-ttg/"
       ],
       "search_queries": [
         "ттг показания когда назначают кому нужно сдать",
@@ -42,7 +42,7 @@
         },
         {
           "url": "https://zdorovie-vn.ru/diagnostika/analizyi/analiz-na-ttg",
-          "title": "Анализ на ТТГ【тиреотропный гормон】- расшифровка и ...",
+          "title": "Анализ на ТТГ【тиреотропный гормон】- расшифровка и нормы",
           "snippet": "Показания к сдаче анализа на ТТГ · подозрение на заболевания щитовидки; · расстройство репродуктивной функции; · бесплодие; · наличие ановуляторных циклов; ..."
         },
         {
@@ -61,22 +61,22 @@
           "snippet": "Сниженный уровень ТТГ чаще всего наблюдается при гипертиреозе. Болезнь Грейвса (диффузный токсический зоб) является наиболее распространенной причиной ..."
         },
         {
-          "url": "https://nmtmed.ru/patsientam/stati/item/946-analoz-ttg-nmt",
-          "title": "О чем расскажет анализ на ТТГ?",
-          "snippet": "Определение уровня ТТГ в крови очень важно для оценки работы эндокринной системы, потому что тиротропин - это основной регулятор работы щитовидной железы. ТТГ ..."
-        },
-        {
-          "url": "https://gemotest.ru/rezh/catalog/issledovaniya-krovi/gormony/funktsiya-shchitovidnoy-zhelezy/ttg/",
-          "title": "ТТГ в Реже",
-          "snippet": "Зачем сдавать этот анализ? Врач может направить пациента на анализ при симптомах гипертиреоза или гипотиреоза, при беременности или её планировании, а также ..."
-        },
-        {
           "url": "https://citilab.ru/articles/kak-sdavat-ttg/",
           "title": "Как правильно сдавать анализ крови на ТТГ",
           "snippet": "Без рекомендации лечащего врача сдавать ТТГ необязательно, но это может быть полезным, если вы неожиданно начали набирать вес, заметили, что ..."
+        },
+        {
+          "url": "https://gemotest.ru/info/ask/myths/mozhno-li-sdavat-ttg-pri-mesyachnykh/",
+          "title": "Можно ли сдавать анализ на ТТГ при месячных",
+          "snippet": "Сдавать анализ на уровень ТТГ во время месячных можно, поскольку менструальный цикл не оказывает значительного влияния на показатели ТТГ. Чтобы ..."
+        },
+        {
+          "url": "https://analizi.spb.ru/specialization/analizy-na-gormony/analizy-na-gormony-shhitovidnoj-zhelezy/analiz-na-ttg/",
+          "title": "Анализ на ТТГ - цена 380 руб. в СПб сети клиник",
+          "snippet": "Показания для сдачи · Подозрение на нарушения в работе щитовидной железы. · Длительное отсутствие менструации. · Сложности с зачатием ребенка. · Бессонница, сильное ..."
         }
       ],
-      "extracted_facts": "* Анализ крови на ТТГ (тиреотропный гормон) — ключевой метод оценки функции щитовидной железы и ранней диагностики её нарушений.\n* ТТГ вырабатывается гипофизом и регулирует выработку гормонов щитовидной железы, которые отвечают за обмен веществ, энергию и общее состояние организма.\n* Исследование помогает вовремя выявить такие состояния, как гипотиреоз и гипертиреоз, а также контролировать эффективность назначенного лечения.",
+      "extracted_facts": "* Тиреотропный гормон (ТТГ) вырабатывается гипофизом и управляет работой щитовидной железы, влияя на обмен веществ, вес, энергию и терморегуляцию.\n* Анализ крови на ТТГ — базовый и самый точный метод диагностики функции щитовидной железы, позволяющий вовремя выявить гипотиреоз или гипертиреоз.\n* Уровень ТТГ меняется в течение суток (пик приходится на ночные часы), поэтому для достоверности исследование необходимо сдавать утром натощак после полноценного сна.\n* Отклонения показателей ТТГ от нормы могут сопровождаться беспричинной утомляемостью, резким изменением веса, тахикардией, сухостью кожи и перепадами настроения.\n* Проверять уровень ТТГ рекомендуется не реже одного раза в год для профилактики или при появлении симптомов нарушений работы эндокринной системы.",
       "warnings": [],
       "fact_cards": [],
       "verify_queries": []
@@ -86,11 +86,11 @@
     "blocks_total": 1,
     "blocks_filled": 1,
     "blocks_verified": 1,
-    "llm_cost_usd": 0.000808,
+    "llm_cost_usd": 0.000792,
     "llm_tokens": {
-      "prompt_tokens": 10175,
-      "completion_tokens": 150,
-      "total_tokens": 12068
+      "prompt_tokens": 9603,
+      "completion_tokens": 237,
+      "total_tokens": 11580
     },
     "sources_used": 9
   }
