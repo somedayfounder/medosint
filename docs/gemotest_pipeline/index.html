@@ -260,14 +260,12 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
       </div>
     </div>
 
-    <!-- Settings: token + repo -->
+    <!-- Worker URL (no token needed in browser) -->
     <div class="settings-section">
-      <label>GitHub Token (PAT)</label>
-      <input id="tokenInput" type="password" placeholder="ghp_xxxxxxxxxxxx" />
-      <label>Репозиторий</label>
-      <input id="repoInput" type="text" placeholder="owner/repo-name" value="somedayfounder/medosint" />
-      <button class="btn-save-token" onclick="saveSettings()">Сохранить</button>
-      <div class="token-status" id="tokenStatus">✓ Сохранено в localStorage</div>
+      <label>Worker URL</label>
+      <input id="workerInput" type="text" placeholder="https://gemotest-trigger.xxx.workers.dev" />
+      <button class="btn-save-token" onclick="saveWorker()">Сохранить</button>
+      <div class="token-status" id="tokenStatus">✓ Сохранено</div>
     </div>
   </div>
 
@@ -345,7 +343,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const WORKFLOW_FILE = 'run.yml';
+const WORKER_URL = () => localStorage.getItem('worker_url') || '';
 const SECTIONS = [
   { key: 'b2c', label: 'B2C — Для пациента' },
   { key: 'b2b', label: 'B2B — Для врача' },
@@ -362,22 +360,17 @@ let sectionEls = {};
 let blocksFilled = 0, blocksTotal = 0, blocksVerified = 0;
 
 // ── Settings ──────────────────────────────────────────────────────────────────
-function getToken() { return localStorage.getItem('gh_token') || ''; }
-function getRepo()  { return localStorage.getItem('gh_repo') || 'somedayfounder/gemotest_pipeline'; }
-
-function saveSettings() {
-  const token = document.getElementById('tokenInput').value.trim();
-  const repo  = document.getElementById('repoInput').value.trim();
-  if (token) localStorage.setItem('gh_token', token);
-  if (repo)  localStorage.setItem('gh_repo', repo);
+function saveWorker() {
+  const url = document.getElementById('workerInput').value.trim();
+  if (url) localStorage.setItem('worker_url', url);
   const st = document.getElementById('tokenStatus');
   st.style.display = 'block';
   setTimeout(() => st.style.display = 'none', 2000);
 }
 
 function loadSettings() {
-  const repo = getRepo();
-  if (repo) document.getElementById('repoInput').value = repo;
+  const url = WORKER_URL();
+  if (url) document.getElementById('workerInput').value = url;
 }
 
 // ── Slugify (matches pipeline.py) ─────────────────────────────────────────────
@@ -526,40 +519,27 @@ function renderProgress(stats) {
   }
 }
 
-// ── GitHub API ────────────────────────────────────────────────────────────────
-function ghHeaders() {
-  return {
-    'Authorization': 'token ' + getToken(),
-    'Accept': 'application/vnd.github.v3+json',
-    'Content-Type': 'application/json',
-  };
-}
-
+// ── Worker API ────────────────────────────────────────────────────────────────
 async function triggerWorkflow(inputs) {
-  const [owner, repo] = getRepo().split('/');
-  const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
-  const r = await fetch(url, {
+  const r = await fetch(WORKER_URL() + '/trigger', {
     method: 'POST',
-    headers: ghHeaders(),
-    body: JSON.stringify({ ref: 'main', inputs }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(inputs),
   });
-  return r.status === 204;
+  if (!r.ok) return false;
+  const d = await r.json();
+  return d.ok === true;
 }
 
 async function findLatestRun() {
-  const [owner, repo] = getRepo().split('/');
-  const url = `https://api.github.com/repos/${owner}/${repo}/actions/runs?event=workflow_dispatch&per_page=5`;
-  const r = await fetch(url, { headers: ghHeaders() });
+  const r = await fetch(WORKER_URL() + '/runs?since=' + encodeURIComponent(startedAt.toISOString()));
   if (!r.ok) return null;
   const d = await r.json();
-  // Find the run created after we triggered
-  const runs = (d.workflow_runs || []).filter(run => new Date(run.created_at) >= startedAt);
-  return runs[0] || null;
+  return d.run || null;
 }
 
 async function getRunStatus(runId) {
-  const [owner, repo] = getRepo().split('/');
-  const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}`, { headers: ghHeaders() });
+  const r = await fetch(WORKER_URL() + '/status?runId=' + runId);
   if (!r.ok) return null;
   return r.json();
 }
@@ -702,7 +682,7 @@ async function openResult(analysis) {
 async function startRun() {
   const analysis = document.getElementById('analysisInput').value.trim();
   if (!analysis) { alert('Введите название анализа'); return; }
-  if (!getToken()) { alert('Добавьте GitHub Token в настройках внизу'); return; }
+  if (!WORKER_URL()) { alert('Добавьте Worker URL в настройках внизу'); return; }
 
   currentAnalysis = analysis;
   currentRunId    = null;
@@ -727,7 +707,7 @@ async function startRun() {
   if (!ok) {
     setStatus('error', 'Error');
     setRunning(false);
-    addLog('error', 'Не удалось запустить workflow. Проверьте токен и имя репозитория.');
+    addLog('error', 'Не удалось запустить workflow. Проверьте Worker URL.');
     document.getElementById('runStatus').textContent = '✗ Ошибка запуска';
     return;
   }
