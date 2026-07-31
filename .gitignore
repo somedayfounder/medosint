@@ -1,0 +1,28 @@
+# Environment
+.env
+*.env
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Pipeline output
+sf_pipeline/output/
+sf_pipeline/dedup_archive/
+gemotest_pipeline/output/
+gemotest_pipeline/docs/results/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

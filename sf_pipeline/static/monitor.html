@@ -1,0 +1,1551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SF Pipeline Monitor</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #f7f7f8;
+  --surface: #ffffff;
+  --surface2:#f0f0f2;
+  --accent:  #d97757;
+  --accent-d:#c4623d;
+  --accent-l:#fff4ef;
+  --green:   #16a34a;
+  --green-l: #f0fdf4;
+  --red:     #dc2626;
+  --red-l:   #fef2f2;
+  --blue:    #2563eb;
+  --yellow:  #b45309;
+  --text:    #111827;
+  --text2:   #374151;
+  --muted:   #9ca3af;
+  --border:  #e5e7eb;
+  --shadow:  0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+  --radius:  10px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; font-size:15px; }
+
+/* ── Header ── */
+header {
+  display:flex; align-items:center; gap:12px;
+  padding:14px 24px; background:var(--surface); border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:20;
+}
+.logo { font-weight:700; font-size:16px; color:var(--text); letter-spacing:-.02em; }
+.logo span { color:var(--accent); }
+.badge {
+  font-size:12px; padding:2px 9px; border-radius:999px;
+  font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+}
+.badge-idle  { background:var(--surface2); color:var(--muted); }
+.badge-run   { background:#dbeafe; color:var(--blue); }
+.badge-done  { background:var(--green-l); color:var(--green); }
+.badge-error { background:var(--red-l); color:var(--red); }
+.badge-stopped { background:#fef9c3; color:#92400e; }
+
+/* ── Main tabs (below header) ── */
+.main-tabs {
+  display:flex; background:var(--surface); border-bottom:1px solid var(--border);
+  padding:0 8px; flex-shrink:0; justify-content:flex-start;
+}
+.main-tab {
+  padding:9px 16px; font-size:14px; font-weight:600;
+  color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;
+  transition:color .15s, border-color .15s; user-select:none; white-space:nowrap;
+}
+.main-tab:hover { color:var(--text2); }
+.main-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+/* ── Layout ── */
+.layout { display:grid; grid-template-columns:340px 1fr 380px; height:calc(100vh - 36px); overflow:hidden; }
+
+/* ── Left panel ── */
+.left { background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+
+/* ── Right sidebar ── */
+.right-sidebar { background:var(--surface); border-left:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; }
+
+.run-form { padding:20px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.run-form label { font-size:14px; font-weight:600; color:var(--text2); display:block; margin-bottom:5px; }
+.run-form input:not([type=checkbox]), .run-form select {
+  width:100%; border:1.5px solid var(--border); background:var(--bg);
+  color:var(--text); border-radius:8px; padding:8px 11px; font-size:14px;
+  margin-bottom:10px; font-family:var(--font); outline:none; transition:border-color .15s;
+}
+.run-form input:focus, .run-form select:focus { border-color:var(--accent); }
+.btn-run {
+  width:100%; padding:10px; background:var(--accent); color:#fff;
+  border:none; border-radius:8px; font-size:14px; font-weight:600;
+  cursor:pointer; transition:background .15s;
+}
+.btn-run:hover { background:var(--accent-d); }
+.btn-run:disabled { opacity:.45; cursor:not-allowed; }
+.btn-stop {
+  width:100%; margin-top:7px; padding:9px; background:transparent; color:var(--red);
+  border:1.5px solid #fca5a5; border-radius:8px; font-size:14px; font-weight:600;
+  cursor:pointer; display:none; transition:background .15s;
+}
+.btn-stop:hover { background:var(--red-l); }
+.btn-stop:disabled { opacity:.4; cursor:not-allowed; }
+
+/* ── Stats / cost hero ── */
+.stats { padding:14px 20px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.section-title { font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; margin-bottom:10px; }
+.cost-hero { background:var(--accent-l); border:1.5px solid #f4c5af; border-radius:10px; padding:14px 16px 12px; }
+.cost-main { font-size:38px; font-weight:800; color:var(--accent); letter-spacing:-.04em; font-variant-numeric:tabular-nums; line-height:1; }
+.cost-sub  { font-size:13px; color:var(--muted); margin-top:5px; }
+.cost-sub span { opacity:.7; }
+.cost-free { font-size:12px; color:var(--green); margin-top:4px; }
+
+/* ── API usage ── */
+.api-stats { padding:12px 20px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.api-row { display:flex; flex-direction:column; gap:3px; padding:7px 0; }
+.api-name { font-size:14px; font-weight:600; color:var(--text2); }
+.api-bar-wrap { width:100%; height:5px; background:var(--border); border-radius:999px; overflow:hidden; }
+.api-bar { height:100%; border-radius:999px; transition:width .4s ease; min-width:2px; background:var(--accent); }
+.api-bar.blue   { background:var(--blue); }
+.api-bar.purple { background:#7c3aed; }
+.api-bar.warn   { background:#f59e0b; }
+.api-bar.danger { background:var(--red); }
+.api-meta { font-size:13px; color:var(--muted); text-align:left; line-height:1.4; white-space:pre-wrap; }
+.model-row { display:flex; align-items:center; gap:6px; padding:2px 0; }
+.model-name { font-size:13px; color:var(--text2); flex:1; }
+.model-cost { font-size:13px; color:#7c3aed; white-space:nowrap; margin-right:8px; }
+.model-tok  { font-size:13px; color:var(--muted); white-space:nowrap; }
+
+/* ── Steps ── */
+.steps { padding:14px 20px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.step-row { display:flex; align-items:center; gap:10px; padding:5px 0; }
+.step-dot {
+  width:18px; height:18px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; border:2px solid var(--border);
+  background:var(--bg); color:var(--muted);
+}
+.step-dot.run   { border-color:var(--blue); color:var(--blue); background:#dbeafe; }
+.step-dot.done  { border-color:var(--green); color:var(--green); background:var(--green-l); }
+.step-dot.err   { border-color:var(--red); color:var(--red); background:var(--red-l); }
+.step-label { font-size:13.5px; color:var(--text2); flex:1; }
+.step-label.run  { color:var(--blue); font-weight:600; }
+.step-label.done { color:var(--green); }
+.step-label.err  { color:var(--red); }
+.step-cost { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; min-width:48px; text-align:right; }
+.step-section-label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.07em; padding:8px 0 2px; }
+
+/* ── Queries panel ── */
+.queries-panel { flex:1; overflow-y:auto; padding:14px 20px; }
+.queries-panel .section-title { margin-bottom:8px; }
+.q-list { display:flex; flex-direction:column; gap:3px; }
+.q-item {
+  display:flex; gap:8px; padding:5px 9px; border-radius:6px;
+  border:1px solid transparent; transition:all .15s; font-size:13.5px;
+}
+.q-item.pending { color:var(--text2); }
+.q-item.run { background:#dbeafe; border-color:#bfdbfe; color:var(--blue); }
+.q-item.done { color:var(--muted); }
+.q-num { font-size:12px; color:var(--muted); flex-shrink:0; width:18px; padding-top:1px; }
+.q-text { flex:1; line-height:1.4; }
+.q-cnt { font-size:12px; color:var(--green); font-weight:600; flex-shrink:0; padding-top:2px; }
+
+/* ── Right panel ── */
+.right { display:flex; flex-direction:column; overflow:hidden; }
+
+/* Tabs */
+.tabs { display:flex; gap:0; border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; padding:0 16px; }
+.tab {
+  padding:10px 14px; font-size:14px; font-weight:500; color:var(--muted);
+  cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;
+}
+.tab:hover { color:var(--text); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab-badge { display:inline-block; background:var(--accent-l); color:var(--accent); border-radius:999px; font-size:11px; font-weight:700; padding:1px 6px; margin-left:4px; }
+
+.tab-pane { display:none; flex:1; overflow:hidden; flex-direction:column; }
+.tab-pane.active { display:flex; }
+
+/* Log tab */
+.log-bar {
+  display:flex; align-items:center; gap:8px; padding:8px 16px;
+  border-bottom:1px solid var(--border); background:var(--bg); flex-shrink:0;
+}
+.log-bar span { font-size:13px; color:var(--muted); flex:1; }
+.btn-xs {
+  padding:3px 9px; background:var(--surface); border:1px solid var(--border);
+  color:var(--text2); border-radius:5px; font-size:12px; cursor:pointer;
+}
+.btn-xs:hover { border-color:var(--accent); color:var(--accent); }
+.refine-item { display:flex; gap:8px; padding:5px 0; border-bottom:1px solid var(--border); align-items:flex-start; }
+.refine-item input[type=checkbox] { margin-top:3px; flex-shrink:0; cursor:pointer; }
+.refine-item-body { flex:1; min-width:0; }
+.refine-title { color:var(--text); font-size:14px; line-height:1.4; }
+.refine-summary { color:var(--muted); font-size:15px; margin-top:2px; line-height:1.5; }
+.btn-search { padding:4px 12px; background:var(--accent); color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
+.btn-search:hover { opacity:.85; }
+.btn-search:disabled { opacity:.4; cursor:not-allowed; }
+#log { flex:1; overflow-y:auto; padding:10px 16px; font-size:13px; line-height:1.7; }
+.ll { display:flex; gap:10px; }
+.ll-ts { color:var(--muted); flex-shrink:0; font-size:12px; padding-top:2px; }
+.ll-body { flex:1; white-space:pre-wrap; word-break:break-all; }
+.t-step         { color:var(--blue); }
+.t-search       { color:var(--yellow); }
+.t-scrape       { color:#7c3aed; }
+.t-scrape_done  { color:var(--muted); }
+.t-scrape_ok    { color:var(--green); }
+.t-llm_call     { color:var(--yellow); }
+.t-llm_done     { color:var(--green); }
+.t-tokens       { color:var(--yellow); }
+.t-error        { color:var(--red); font-weight:600; }
+.t-start        { color:var(--blue); font-weight:600; }
+.t-done         { color:var(--green); font-weight:600; }
+.t-stopped      { color:var(--red); font-weight:600; }
+.t-api          { color:#6d28d9; }
+
+/* Stories tab */
+#storiesPane { overflow-y:auto; padding:16px; }
+.story-count { font-size:13px; color:var(--muted); padding:0 0 12px 0; }
+.s-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow);
+}
+.s-header { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+.chip { font-size:12px; padding:2px 8px; border-radius:999px; font-weight:600; }
+.chip-area { background:var(--accent-l); color:var(--accent); }
+.chip-id    { background:var(--bg); color:var(--muted); border:1px solid var(--border); }
+.chip-topic { background:#f0f4ff; color:#4466cc; border:1px solid #c4d0f0; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (prefers-color-scheme: dark) { .chip-topic { background:#1e2a4a; color:#7799ee; border-color:#3355aa; } }
+.s-principle { font-size:13px; font-weight:400; line-height:1.5; color:var(--text); }
+.s-situation { font-size:13px; color:var(--muted); margin-top:4px; }
+
+#groupCheckboxes label { font-weight:400; }
+
+/* Areas tab */
+#areasPane { overflow-y:auto; padding:16px; }
+.area-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px; }
+.area-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:12px 14px; box-shadow:var(--shadow);
+}
+.area-card-name { font-size:13.5px; font-weight:600; color:var(--text2); margin-bottom:4px; }
+.area-card-count { font-size:23px; font-weight:700; color:var(--accent); }
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+.shimmer {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--text2) 50%, var(--muted) 75%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 1.8s linear infinite;
+  display: inline-block;
+}
+</style>
+</head>
+<body>
+
+<div class="main-tabs">
+  <div class="main-tab active" id="navSearch" onclick="switchMainTab('search')">Поиск</div>
+  <div class="main-tab" id="navStories" onclick="switchMainTab('stories')">Истории</div>
+  <div class="main-tab" id="navHow" onclick="switchMainTab('how')">Как работает</div>
+</div>
+
+<div class="layout">
+  <!-- Left: form only -->
+  <div class="left">
+    <div class="run-form">
+      <label>Company</label>
+      <input id="company" type="text" placeholder="e.g. Southwest Airlines" />
+      <label style="margin-top:12px;margin-bottom:6px;font-weight:400;display:flex;align-items:center;gap:7px;cursor:pointer">
+        <input type="checkbox" id="selectAllAreas" checked onchange="toggleAllAreas(this)"> Areas
+      </label>
+      <hr style="border:none;border-top:1px solid var(--border);margin:0 0 6px">
+      <div id="groupCheckboxes" style="display:flex;flex-direction:column;gap:3px;margin-bottom:14px">
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="personal_growth" checked onchange="updateAreasSelectAll()"> Personal Growth</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="work_career" checked onchange="updateAreasSelectAll()"> Work &amp; Career</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="office_survival" checked onchange="updateAreasSelectAll()"> Office Survival</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="marketing" checked onchange="updateAreasSelectAll()"> Marketing</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="sales" checked onchange="updateAreasSelectAll()"> Sales</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="customer_success" checked onchange="updateAreasSelectAll()"> Customer Success</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="finance" checked onchange="updateAreasSelectAll()"> Finance</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="digital_product" checked onchange="updateAreasSelectAll()"> Digital Product</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="goods_services" checked onchange="updateAreasSelectAll()"> Goods &amp; Services</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="people_leadership" checked onchange="updateAreasSelectAll()"> People &amp; Leadership</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="it_technology" checked onchange="updateAreasSelectAll()"> IT &amp; Technology</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="operations" checked onchange="updateAreasSelectAll()"> Operations</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="strategy" checked onchange="updateAreasSelectAll()"> Strategy</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="the_founder" checked onchange="updateAreasSelectAll()"> The Founder</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="iconic_stories" checked onchange="updateAreasSelectAll()"> Iconic Stories</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" value="named_concepts" checked onchange="updateAreasSelectAll()"> Named Concepts</label>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:4px 0 14px">
+      <label style="margin-bottom:5px">Model</label>
+      <select id="modelSelect" style="width:100%;border:1.5px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;padding:8px 11px;font-size:14px;margin-bottom:14px;font-family:var(--font);outline:none;transition:border-color .15s">
+        <option value="gemini">gemini-3.6-flash</option>
+        <option value="openai">gpt-5.6-luna</option>
+        <option value="gemini,openai">Flash + Luna</option>
+      </select>
+      <button class="btn-run" id="runBtn" onclick="startRun()">▶  Run pipeline</button>
+      <button class="btn-stop" id="stopBtn" onclick="stopRun()">■  Stop</button>
+    </div>
+
+  </div>
+
+  <!-- Center: tabs -->
+  <div class="right">
+    <div class="tabs">
+      <div class="tab active" id="tabModels" onclick="switchTab('models')">Raw <span class="tab-badge" id="modelsBadge">0</span></div>
+      <div class="tab" onclick="switchTab('log')">Log <span class="tab-badge" id="logBadge">0</span></div>
+    </div>
+
+    <!-- Models tab -->
+    <div class="tab-pane active" id="modelsPane">
+      <div id="continueBar" style="display:none;padding:12px 16px;background:var(--accent-l);border-bottom:1px solid var(--accent);flex-shrink:0;align-items:center;gap:12px">
+        <span style="font-size:14px;color:var(--accent);font-weight:600">Review model output above, then continue the pipeline</span>
+        <button onclick="continuePipeline()" style="margin-left:auto;padding:7px 18px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer">▶ Continue</button>
+      </div>
+      <div class="log-bar">
+        <span id="modelsInfo" style="color:var(--muted);font-size:13px"></span>
+        <button class="btn-xs" onclick="copyModels()">Copy</button>
+      </div>
+      <div id="modelsContent" style="flex:1;overflow-y:auto;padding:12px 16px;font-family:var(--font);font-size:13px;line-height:1.7">
+        <span class="mc-placeholder" style="color:var(--muted)">Model knowledge dump will appear here…</span>
+      </div>
+    </div>
+
+    <!-- Refine tab -->
+    <div class="tab-pane" id="refinePane">
+      <div id="refineContinueBar" style="display:none;padding:12px 16px;background:var(--accent-l);border-bottom:1px solid var(--accent);flex-shrink:0;align-items:center;gap:12px">
+        <span style="font-size:14px;color:var(--accent);font-weight:600">Выбери события для поиска, затем нажми Continue</span>
+        <button onclick="continuePipeline()" style="margin-left:auto;padding:7px 18px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer">▶ Continue</button>
+      </div>
+      <div class="log-bar">
+        <span id="refineInfo" style="color:var(--muted);font-size:13px"></span>
+        <div id="refineSelectActions" style="display:none;align-items:center;gap:6px;flex:1;justify-content:flex-end">
+          <button class="btn-xs" onclick="toggleAllRefine(true)">Все</button>
+          <button class="btn-xs" onclick="toggleAllRefine(false)">Снять</button>
+          <button class="btn-search" id="searchSelectedBtn" onclick="searchSelected()">Искать (0) →</button>
+        </div>
+        <button class="btn-xs" onclick="copyRefine()">Copy</button>
+      </div>
+      <div id="refineContent" style="flex:1;overflow-y:auto;padding:12px 16px;font-family:var(--mono);font-size:13px;line-height:1.7">
+        <span style="color:var(--muted)">Deduplicated event list will appear here after refine step…</span>
+      </div>
+    </div>
+
+    <!-- Log tab -->
+    <div class="tab-pane" id="logPane">
+      <div class="log-bar">
+        <span id="logInfo">Waiting for run…</span>
+        <button class="btn-xs" onclick="copyLog()">Copy</button>
+        <button class="btn-xs" onclick="clearLog()">Clear</button>
+        <button class="btn-xs" id="asBtn" onclick="toggleAS()">↓ Auto</button>
+      </div>
+      <div id="log"></div>
+    </div>
+
+    <!-- Stories tab -->
+    <div class="tab-pane" id="storiesPane">
+      <div class="story-count" id="storyCountLbl" style="padding:16px 16px 0">0 stories collected</div>
+      <div id="storyCards" style="padding:8px 16px 16px"></div>
+    </div>
+
+    <!-- Areas tab -->
+    <div class="tab-pane" id="areasPane">
+      <div style="padding:16px">
+        <div class="area-grid" id="areaGrid"><span style="color:var(--muted);font-size:14px">No data yet</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right sidebar: stats / api / steps -->
+  <div class="right-sidebar">
+    <div class="stats">
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+        Results
+        <span onclick="clearStories()" style="font-size:11px;color:var(--muted);cursor:pointer;font-weight:400;letter-spacing:0" title="Delete all stories">✕ clear stories</span>
+      </div>
+      <div class="cost-hero">
+        <div class="cost-main" id="sCost">$0.000</div>
+        <div class="cost-sub">This run · <span id="sSessTotal">$0 this month</span></div>
+        <div class="cost-free" id="sCostFree"></div>
+      </div>
+    </div>
+
+    <div class="steps">
+      <div class="section-title">Steps</div>
+      <div id="stepsList"></div>
+    </div>
+
+    <div class="api-stats">
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+        API usage
+        <span onclick="resetSess()" style="font-size:11px;color:var(--muted);cursor:pointer;font-weight:400;letter-spacing:0" title="Reset session totals">↺ reset</span>
+      </div>
+      <div class="api-row">
+        <span class="api-name">Serper</span>
+        <div class="api-bar-wrap"><div class="api-bar" id="serperBar" style="width:0%"></div></div>
+        <span class="api-meta" id="serperMeta">0 queries · $0</span>
+      </div>
+      <div class="api-row">
+        <span class="api-name">Tavily</span>
+        <div class="api-bar-wrap"><div class="api-bar" id="tavilyBar" style="width:0%"></div></div>
+        <span class="api-meta" id="tavilyMeta">0 credits · $0</span>
+      </div>
+      <div class="api-row">
+        <span class="api-name">LLM</span>
+        <div class="api-bar-wrap"><div class="api-bar purple" id="llmBar" style="width:0%"></div></div>
+        <span class="api-meta" id="llmMeta">—</span>
+      </div>
+      <div class="api-row">
+        <span class="api-name">Grounding</span>
+        <div class="api-bar-wrap"><div class="api-bar warn" id="groundingBar" style="width:0%"></div></div>
+        <span class="api-meta" id="groundingMeta">0 queries · 5000/mo free</span>
+      </div>
+      <div id="modelBreakdown" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Stories tab (full browser) ── -->
+<div id="mainStories" style="display:none;height:calc(100vh - 36px);overflow-y:auto">
+  <div style="padding:16px 24px;max-width:1000px;margin:0 auto">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <input id="bSearch" type="text" placeholder="Search stories…" oninput="debounceStories()" style="background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:14px;outline:none;width:220px" />
+      <select id="bCompany" onchange="loadBrowserStories()" style="background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:14px;outline:none"></select>
+      <select id="bArea" onchange="loadBrowserStories()" style="background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:14px;outline:none"></select>
+      <span id="bTotal" style="font-size:13px;color:var(--muted);margin-left:auto"></span>
+    </div>
+    <div id="bGrid"></div>
+    <div id="bPagination" style="display:flex;gap:8px;justify-content:center;padding:24px 0"></div>
+  </div>
+</div>
+
+<!-- ── How it works tab ── -->
+<div id="mainHow" style="display:none;height:calc(100vh - 36px);overflow-y:auto">
+  <div style="padding:24px;max-width:760px;margin:0 auto;font-size:15px;line-height:1.7;color:var(--text2)">
+    <h2 style="font-size:19px;font-weight:700;color:var(--text);margin-bottom:20px">Как работает пайплайн</h2>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--accent);text-transform:uppercase;margin-bottom:10px">Шаг 1 — Knowledge Gather</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>Gemini 3.6 Flash (с Google Search grounding) вызывается параллельно для каждой из 16 областей. По каждой области модель перечисляет все конкретные named события, решения, кейсы о компании.</div>
+        <div><span style="font-weight:600;color:var(--text)">Формат CARQ:</span> каждая история выводится в виде блока с полями <code>C</code> (контекст: год, место, люди), <code>A</code> (подробная история), <code>R</code> (итог и цифры), <code>Q</code> (3 поисковых запроса на английском для обогащения).</div>
+        <div><span style="font-weight:600;color:var(--text)">Три прохода:</span> после основного списка модель делает второй проход по каждому топику и третий финальный проход — для извлечения менее очевидных историй (знаменитые письма, инциденты, внутренние практики).</div>
+        <div><span style="font-weight:600;color:var(--text)">Google Search grounding:</span> модель автономно решает, что именно нужно проверить в интернете — все запросы видны в логе. Лимит: 5000 запросов/месяц бесплатно.</div>
+        <div><span style="font-weight:600;color:var(--text)">Топики по областям:</span> каждая область имеет специализированный список тем, включая Famous Stories, Named Concepts, Retail/Marketing Hacks — для вытягивания нишевых историй.</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--blue);text-transform:uppercase;margin-bottom:10px">Шаг 2 — Refine</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>GPT-5.6 Terra получает объединённый вывод всех областей и удаляет точные дубликаты (один и тот же конкретный эпизод от разных областей). Принцип: минимум 80% от числа уникальных записей остаётся. Результат — пронумерованный список событий с краткими RU-аннотациями.</div>
+        <div>После refine пайплайн делает паузу — можно выбрать конкретные события для поиска через Brave.</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--green);text-transform:uppercase;margin-bottom:10px">Шаг 3 — Story Search + Анализ</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div><span style="font-weight:600;color:var(--text)">Story queries</span> — по выбранным событиям генерируются точные поисковые запросы. Например: <em>"Southwest Airlines Herb Kelleher Crabapple letter customer"</em>.</div>
+        <div><span style="font-weight:600;color:var(--text)">Brave Search + Jina</span> — каждый запрос → 5 URL → скрейп через Jina Reader (до 20k символов на страницу). Домен компании не исключается.</div>
+        <div><span style="font-weight:600;color:var(--text)">Analysis</span> — весь контент делится на чанки ~55k символов, каждый анализируется LLM: извлекаются STAR-истории (ID, P, S, T, A, R).</div>
+        <div><span style="font-weight:600;color:var(--text)">Translation + Save</span> — истории переводятся на русский, сохраняются в SQLite и .md файл.</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface2);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--muted)">
+      <strong style="color:var(--text2)">Модели:</strong> Knowledge — Gemini 3.6 Flash (с grounding). Refine — GPT-5.6 Terra. Анализ — выбранная модель (по умолчанию GPT-5.6 Luna). Story queries — выбранная модель.<br>
+      <strong style="color:var(--text2)">Стоимость:</strong> ~$0.05–0.10 за компанию (только Gemini Flash + grounding). Brave Search: $0.003/запрос.
+    </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const STEP_GROUPS = [
+  { label: 'Knowledge', steps: [
+    {key:'knowledge_gather', label:'Flash (wt grounding)'},
+  ]},
+  { label: 'Enrich', steps: [
+    {key:'enrich_brave',     label:'Google / Serper'},
+    {key:'enrich_extract',   label:'Flash Lite (extract)'},
+    {key:'enrich_narrative', label:'Flash (narrative)'},
+  ]},
+];
+const STEPS = STEP_GROUPS.flatMap(g => g.steps);
+
+// Cost tracking per step
+let stepCosts = {};    // {key: $cost} recorded when step completes
+let stepBaseline = {}; // {key: $cost at step start}
+let runCostTotal = 0;  // cumulative LLM + Brave cost this run
+
+let logCount = 0, autoScroll = true;
+let stepState = {};
+let queryData = [], searchIdx = -1;
+
+// Per-run counters (reset on pipeline_start, initialized from DB monthly values)
+let braveTotal = 0, jinaTotal = 0, tavilyTotal = 0, serperTotal = 0, llmCost = 0, llmIn = 0, llmOut = 0, groundingTotal = 0;
+// Baseline values captured at pipeline_start for accurate per-run delta
+let baselineSerper = 0, baselineTavily = 0;
+let braveQuota = null, jinaQuota = null;
+
+// Monthly totals from DB — loaded on page load and after each run
+let monthlyStats = {brave: 0, jina: 0, grounding: 0, tavily: 0, serper: 0, llm_cost: 0, llm_in: 0, llm_out: 0};
+
+async function loadUsageStats() {
+  try {
+    const r = await fetch('/api/usage_stats');
+    monthlyStats = await r.json();
+    renderStats();
+  } catch(e) {}
+}
+
+function saveSess() { /* replaced by DB */ }
+function resetSess() {
+  saveSess(); renderStats(); resetModelBreakdown();
+}
+
+async function clearStories() {
+  if (!confirm('Delete all stories from the database?')) return;
+  const r = await fetch('/api/clear_stories', {method:'POST'});
+  const d = await r.json();
+  if (d.status === 'cleared') {
+    stats.stories = 0;
+    renderStats();
+  }
+}
+
+let stats = {urls:null, scraped:null, stories:0};
+let areaCounts = {};
+let totalModelEvents = 0;
+let areaSections = new Map();
+let stories = [];
+let activeTab = 'models';
+
+// ── Tab ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names = ['models','log'];
+    t.classList.toggle('active', names[i] === tab);
+  });
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById(tab+'Pane');
+  if (pane) pane.classList.add('active');
+}
+
+// ── Badge ─────────────────────────────────────────────────────────────────────
+function setBadge(cls, label) {
+  // header removed — no-op
+}
+
+function setRunning(on) {
+  document.getElementById('runBtn').style.display = on ? 'none' : 'block';
+  document.getElementById('stopBtn').style.display = on ? 'block' : 'none';
+  document.getElementById('stopBtn').disabled = false;
+  document.getElementById('stopBtn').textContent = '■  Stop';
+}
+
+// ── Steps ─────────────────────────────────────────────────────────────────────
+function renderSteps() {
+  const icons = {run:'↻', done:'✓', err:'✕'};
+  document.getElementById('stepsList').innerHTML = STEP_GROUPS.map(g => {
+    const rows = g.steps.map(s => {
+      const st = stepState[s.key] || 'pending';
+      const cost = stepCosts[s.key];
+      const costStr = cost != null ? '$' + cost.toFixed(3) : '';
+      return `<div class="step-row">
+        <div class="step-dot ${st}">${st!=='pending'?icons[st]||'':''}</div>
+        <span class="step-label ${st}">${s.label}</span>
+        <span class="step-cost">${costStr}</span>
+      </div>`;
+    }).join('');
+    return `<div class="step-section-label">${g.label}</div>${rows}`;
+  }).join('');
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function fmtK(n) { return n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n); }
+
+function renderStats() {
+  const moSerper = monthlyStats.serper || 0;
+  const moTavily = monthlyStats.tavily || 0;
+  // Per-run delta — subtract baseline captured at pipeline_start
+  const runSerper = Math.max(0, serperTotal - baselineSerper);
+  const runTavily = Math.max(0, tavilyTotal - baselineTavily);
+  const runCost = runSerper * 0.001 + runTavily * 0.008 + llmCost;
+  document.getElementById('sCost').textContent = '$' + runCost.toFixed(3);
+  // Monthly cost — only count queries beyond the free tier
+  const paidSerper = Math.max(0, moSerper - 2500);
+  const paidTavily = Math.max(0, moTavily - 1000);
+  const moCost = paidSerper * 0.001 + paidTavily * 0.008 + (monthlyStats.llm_cost || 0);
+  document.getElementById('sSessTotal').textContent = '$' + moCost.toFixed(3) + ' this month';
+  // Free tier remaining
+  const serperFree = Math.max(0, 2500 - moSerper);
+  const tavilyFree = Math.max(0, 1000 - moTavily);
+  const freeEl = document.getElementById('sCostFree');
+  if (serperFree > 0 || tavilyFree > 0) {
+    freeEl.textContent = `free tier: ${serperFree} Serper · ${tavilyFree} Tavily left`;
+  } else {
+    freeEl.textContent = '';
+  }
+
+  // ── Serper bar (free tier: 2500 queries/mo) ──
+  const sBar = document.getElementById('serperBar');
+  const sPct = Math.min(moSerper / 2500 * 100, 100);
+  sBar.style.width = sPct.toFixed(2) + '%';
+  sBar.className = 'api-bar' + (sPct > 80 ? ' danger' : sPct > 60 ? ' warn' : '');
+  const sLeft = Math.max(0, 2500 - moSerper);
+  document.getElementById('serperMeta').textContent =
+    `${runSerper} run · ${moSerper} mo · ${sLeft} left`;
+
+  // ── Tavily Extract bar (free tier: 1000 cr/mo) ──
+  const tBar = document.getElementById('tavilyBar');
+  const tPct = Math.min(moTavily / 1000 * 100, 100);
+  tBar.style.width = tPct.toFixed(2) + '%';
+  tBar.className = 'api-bar' + (tPct > 80 ? ' danger' : tPct > 60 ? ' warn' : '');
+  const tLeft = Math.max(0, 1000 - moTavily);
+  document.getElementById('tavilyMeta').textContent =
+    `${runTavily} run · ${moTavily} mo · ${tLeft} left`;
+
+  // ── LLM bar ──
+  const moLLM = monthlyStats.llm_cost;
+  const lPct = Math.min(llmCost / 0.20 * 100, 100);
+  document.getElementById('llmBar').style.width = lPct.toFixed(1) + '%';
+  document.getElementById('llmMeta').textContent = llmIn
+    ? `$${llmCost.toFixed(4)} run · $${moLLM.toFixed(4)} mo`
+    : (moLLM > 0 ? `$${moLLM.toFixed(4)} this month` : '—');
+
+  // ── Grounding bar ── monthly limit 5000
+  const moGround = monthlyStats.grounding;
+  const gPct = Math.min(moGround / 5000 * 100, 100);
+  document.getElementById('groundingBar').style.width = gPct.toFixed(2) + '%';
+  document.getElementById('groundingMeta').textContent = `${moGround} queries · ${5000 - moGround} left this month`;
+}
+
+const MODEL_DISPLAY = {
+  // Knowledge dump models
+  'gpt-5.6-luna':             'GPT-5.6 Luna',
+  'gemini-3.6-flash':         'Gemini 3.6 Flash',
+  'deepseek-chat':            'DeepSeek V3',
+  'kimi-k2.6':                'Kimi K2.6',
+  // Refine / analysis
+  'gpt-5.6-terra':            'GPT-5.6 Terra',
+  'gpt-4o-mini':              'GPT-4o mini',
+  'claude-sonnet-5':          'Claude Sonnet 5',
+  'claude-haiku-4-5-20251001':'Claude Haiku 4.5',
+  'grok-4.3':                 'Grok 4.3',
+};
+
+let _byModel = {};
+
+function renderModelBreakdown(byModel) {
+  Object.assign(_byModel, byModel);
+  const el = document.getElementById('modelBreakdown');
+  if (!el) return;
+
+  // Only show models that have run; catch-all loop below handles all of them
+  const allModels = [];
+  const seen = new Set();
+  const rows = [];
+  for (const m of allModels) {
+    const label = MODEL_DISPLAY[m] || m;
+    if (seen.has(label)) continue;
+    seen.add(label);
+    const v = _byModel[m];
+    if (!v) {
+      rows.push(`<div class="model-row"><span class="model-name" style="color:var(--muted)">${label}</span><span class="model-cost" style="color:var(--muted)">—</span></div>`);
+    } else {
+      const tok = `${v.in>=1000?(v.in/1000).toFixed(1)+'k':v.in}↑ ${v.out>=1000?(v.out/1000).toFixed(1)+'k':v.out}↓`;
+      rows.push(`<div class="model-row"><span class="model-name">${label}</span><span class="model-cost">$${v.cost.toFixed(4)}</span><span class="model-tok">${tok}</span></div>`);
+    }
+  }
+  // Also show any model not in the list above
+  for (const [m, v] of Object.entries(_byModel)) {
+    const label = MODEL_DISPLAY[m] || m;
+    if (seen.has(label)) continue;
+    seen.add(label);
+    const tok = `${v.in>=1000?(v.in/1000).toFixed(1)+'k':v.in}↑ ${v.out>=1000?(v.out/1000).toFixed(1)+'k':v.out}↓`;
+    rows.push(`<div class="model-row"><span class="model-name">${label}</span><span class="model-cost">$${v.cost.toFixed(4)}</span><span class="model-tok">${tok}</span></div>`);
+  }
+  el.innerHTML = rows.join('');
+}
+
+function resetModelBreakdown() {
+  _byModel = {};
+  renderModelBreakdown({});
+}
+
+// ── Queries ───────────────────────────────────────────────────────────────────
+function renderQueries() { /* queries panel removed */ }
+
+// ── Web enrichment ────────────────────────────────────────────────────────────
+async function runEnrich(btn, story, wrap) {
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  let enrichWrap = wrap.querySelector('.enrich-result');
+  if (!enrichWrap) {
+    enrichWrap = document.createElement('div');
+    enrichWrap.className = 'enrich-result';
+    enrichWrap.style.cssText = 'margin-top:10px';
+    wrap.appendChild(enrichWrap);
+  }
+  enrichWrap.innerHTML = '<div style="font-size:12px"><span class="shimmer">Google/Serper · Tavily Extract · Flash narrative…</span></div>';
+
+  try {
+    const res = await fetch('/api/enrich_web', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({story})
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error('enrich_web error', res.status, txt);
+      enrichWrap.innerHTML = `<div style="color:var(--red,#e57373);font-size:12px">⚠ HTTP ${res.status}: ${txt.slice(0,200)}</div>`;
+      btn.textContent = 'Retry'; btn.disabled = false; btn.style.color = '';
+      return;
+    }
+    const data = await res.json();
+    if (data.error) {
+      enrichWrap.innerHTML = `<div style="color:var(--red,#e57373);font-size:12px">⚠ ${data.error}</div>`;
+      btn.textContent = 'Retry'; btn.disabled = false; btn.style.color = '';
+      return;
+    }
+
+    enrichWrap.innerHTML = '';
+
+    // ── Enriched narrative (top, always visible) ──
+    const srcCount = (data.sources || []).length;
+    if (data.A_enriched) {
+      const label = document.createElement('div');
+      label.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#16a34a;margin-top:10px;margin-bottom:5px;display:flex;align-items:center;gap:8px';
+      label.innerHTML = `● Обогащено · ${srcCount} <span style="opacity:.6">${srcCount===1?'источник':srcCount<5?'источника':'источников'}</span><span style="flex:1;height:1px;background:#16a34a44;display:inline-block"></span>`;
+      enrichWrap.appendChild(label);
+
+      const aDiv = document.createElement('div');
+      aDiv.style.cssText = 'font-size:13px;line-height:1.6;color:var(--text);margin-bottom:8px;padding:12px 14px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;white-space:pre-wrap';
+      aDiv.textContent = data.A_enriched;
+      enrichWrap.appendChild(aDiv);
+
+      // Добавляем зелёную плашку к строке с ID (непосредственно перед enrichWrap)
+      const idRow = enrichWrap.previousElementSibling;
+      if (idRow && !idRow.querySelector('.enrich-badge')) {
+        const badge = document.createElement('span');
+        badge.className = 'enrich-badge';
+        badge.style.cssText = 'display:inline-flex;align-items:center;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#16a34a;color:#fff';
+        badge.textContent = '✓ enriched';
+        idRow.appendChild(badge);
+      }
+    }
+    const cardCount = (data.fact_cards || []).length;
+    const failCount = (data.failed_sources || []).length;
+
+    const det = document.createElement('details');
+    det.style.cssText = 'font-size:12px;margin-top:4px;border:1px solid var(--border);border-radius:8px;overflow:hidden';
+    const summ = document.createElement('summary');
+    summ.style.cssText = 'cursor:pointer;color:var(--text2);user-select:none;list-style:none;display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--surface2);font-weight:600;font-size:12px';
+    summ.textContent = `${srcCount} источников · ${cardCount} карточек фактов` + (failCount ? ` · ${failCount} не скрейпились` : '');
+    det.appendChild(summ);
+
+    const inner = document.createElement('div');
+    inner.style.cssText = 'margin-top:8px;display:flex;flex-direction:column;gap:10px;padding:0 8px 8px';
+
+    // Fact cards with inline source link
+    (data.fact_cards || []).forEach((fc, i) => {
+      const card = document.createElement('div');
+      card.style.cssText = 'padding:8px;background:var(--bg2);border-radius:4px;border-left:2px solid var(--border)';
+
+      const urlLine = document.createElement('a');
+      urlLine.href = fc.url; urlLine.target = '_blank';
+      urlLine.style.cssText = 'font-size:11px;color:var(--blue);text-decoration:none;display:block;margin-bottom:4px;word-break:break-all';
+      urlLine.textContent = fc.url;
+      card.appendChild(urlLine);
+
+      const cardText = document.createElement('pre');
+      cardText.style.cssText = 'font-family:var(--font);font-size:11px;color:var(--text2);white-space:pre-wrap;word-break:break-word;margin:0;line-height:1.5';
+      cardText.textContent = fc.card;
+      card.appendChild(cardText);
+
+      inner.appendChild(card);
+    });
+
+    // Failed/empty sources — collapsed sub-details
+    if (data.failed_sources && data.failed_sources.length) {
+      const failDet = document.createElement('details');
+      failDet.style.cssText = 'margin-top:4px';
+      const failSumm = document.createElement('summary');
+      failSumm.style.cssText = 'cursor:pointer;color:var(--muted);font-size:11px;list-style:none';
+      failSumm.textContent = `${data.failed_sources.length} не скрейпились (пусто / 403 / навигация)`;
+      failDet.appendChild(failSumm);
+      const failList = document.createElement('div');
+      failList.style.cssText = 'display:flex;flex-direction:column;gap:2px;margin-top:4px';
+      data.failed_sources.forEach(url => {
+        const a = document.createElement('a');
+        a.href = url; a.target = '_blank';
+        a.style.cssText = 'color:var(--muted);font-size:10px;text-decoration:none;word-break:break-all';
+        try { a.textContent = new URL(url).hostname.replace('www.','') + new URL(url).pathname.slice(0,50); }
+        catch { a.textContent = url.slice(0,80); }
+        failList.appendChild(a);
+      });
+      failDet.appendChild(failList);
+      inner.appendChild(failDet);
+    }
+
+    det.appendChild(inner);
+    enrichWrap.appendChild(det);
+
+    btn.textContent = 'Re-enrich'; btn.disabled = false; btn.style.color = 'var(--green,#4caf50)';
+  } catch(e) {
+    enrichWrap.innerHTML = `<div style="color:var(--red,#e57373);font-size:12px">⚠ ${e.message}</div>`;
+    btn.textContent = 'Retry'; btn.disabled = false; btn.style.color = '';
+  }
+}
+
+// ── Stories ───────────────────────────────────────────────────────────────────
+function addStoryCard(s) {
+  const d = document.createElement('div');
+  d.className = 's-card';
+  const text = s.A || s.principle || '';
+  const ctx  = s.C || s.situation || '';
+  d.innerHTML = `<div class="s-header">
+    <span class="chip chip-area">${esc(s.area)}</span>
+    <span class="chip chip-id">${esc(s.id)}</span>
+    ${s.topic ? `<span class="chip chip-topic" title="${esc(s.topic)}">${esc(s.topic.split(',')[0].trim())}</span>` : ''}
+  </div>
+  <div class="s-principle">${esc(text.slice(0,200))}</div>
+  ${ctx ? `<div class="s-situation">${esc(ctx)}</div>` : ''}`;
+  document.getElementById('storyCards').prepend(d);
+}
+
+function renderAreas() {
+  const grid = document.getElementById('areaGrid');
+  const entries = Object.entries(areaCounts).sort((a,b)=>b[1]-a[1]);
+  if (!entries.length) { grid.innerHTML='<span style="color:var(--muted);font-size:14px">No data yet</span>'; return; }
+  grid.innerHTML = entries.map(([a,n])=>`<div class="area-card">
+    <div class="area-card-count">${n}</div>
+    <div class="area-card-name">${esc(a)}</div>
+  </div>`).join('');
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+function log(type, msg, ev) {
+  const el = document.getElementById('log');
+  const ts = (ev&&ev.ts) ? ev.ts.split('T')[1] : new Date().toTimeString().slice(0,8);
+  const d = document.createElement('div');
+  d.className = 'll';
+  d.innerHTML = `<span class="ll-ts">${ts}</span><span class="ll-body t-${type}">${esc(msg)}</span>`;
+  el.appendChild(d);
+  logCount++;
+  document.getElementById('logInfo').textContent = logCount+' events';
+  document.getElementById('logBadge').textContent = logCount;
+  if (autoScroll) el.scrollTop = el.scrollHeight;
+}
+function clearLog() { document.getElementById('log').innerHTML=''; logCount=0; document.getElementById('logInfo').textContent='0 events'; document.getElementById('logBadge').textContent=0; }
+
+function copyLog() {
+  const lines = [];
+  document.querySelectorAll('#log .ll').forEach(el => lines.push(el.textContent.trim()));
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const btn = document.querySelector('#logPane .log-bar .btn-xs');
+    btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function copyModels() {
+  const lines = [];
+  areaSections.forEach((el, area) => {
+    lines.push('▸ ' + area);
+    el.querySelectorAll(':scope > div:not(:first-child)').forEach(modelEl => {
+      modelEl.childNodes.forEach(n => { if (n.textContent?.trim()) lines.push('  ' + n.textContent.trim()); });
+    });
+    lines.push('');
+  });
+  navigator.clipboard.writeText(lines.join('\n').trim()).then(() => {
+    const btn = document.querySelector('#modelsPane .log-bar .btn-xs');
+    btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function copyRefine() {
+  const lines = refinedEvents.map((ev, i) =>
+    `${i+1}. ${ev.title}${ev.summary_ru ? '\n   ' + ev.summary_ru : ''}`
+  );
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const btn = document.querySelector('#refinePane .log-bar .btn-xs');
+    btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+function toggleAS() { autoScroll=!autoScroll; document.getElementById('asBtn').textContent=(autoScroll?'↓ Auto':'  Manual'); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Events ────────────────────────────────────────────────────────────────────
+function handle(ev) {
+  const t = ev.type;
+
+  if (t === 'connected') {
+    fetch('/api/status').then(r=>r.json()).then(d=>{
+      if (d.running) { setBadge('run','Running'); setRunning(true); }
+      if (d.paused && d.paused_events?.length) {
+        refinedEvents = d.paused_events;
+        // refineBadge removed
+        document.getElementById('refineInfo').textContent = refinedEvents.length + ' событий';
+        renderRefineChecklist(true);
+        document.getElementById('refineSelectActions').style.display = 'flex';
+        updateSearchSelectedBtn();
+        setBadge('paused', 'Paused');
+        switchTab('models');
+      }
+    });
+  }
+
+  if (t === 'pipeline_start') {
+    stepState={}; stepCosts={}; stepBaseline={}; runCostTotal=0;
+    queryData=[]; searchIdx=-1; stories=[]; areaCounts={}; areaSections=new Map(); totalModelEvents=0;
+    // Init monthly stats from DB values sent in pipeline_start
+    if (ev.monthly) monthlyStats = ev.monthly;
+    // Reset per-run counters; brave/jina/grounding start from monthly DB values
+    const m = ev.monthly || {};
+    braveTotal = m.brave || 0;
+    jinaTotal  = m.jina  || 0;
+    tavilyTotal = m.tavily || 0;
+    serperTotal = m.serper || 0;
+    groundingTotal = m.grounding || 0;
+    baselineSerper = m.serper || 0;
+    baselineTavily = m.tavily || 0;
+    llmCost=llmIn=llmOut=0;
+    braveQuota=null; jinaQuota=null;
+    resetModelBreakdown();
+    stats={urls:null,scraped:null,stories:0};
+    document.getElementById('storyCards').innerHTML='';
+    document.getElementById('storyCountLbl').textContent='0 stories';
+    // storiesBadge removed
+    renderSteps(); renderStats(); renderQueries(); renderAreas();
+    setBadge('run','Running'); setRunning(true);
+    log('start', `▶ ${ev.company}`, ev);
+  }
+
+  if (t === 'pipeline_done') {
+    setBadge('done','Done'); setRunning(false);
+    stats.stories = ev.total_stories;
+    areaCounts = ev.area_counts || {};
+    if (searchIdx>=0 && queryData[searchIdx]) queryData[searchIdx].state='done';
+    stepState.persist='done';
+    renderSteps(); renderQueries(); renderAreas();
+    loadUsageStats(); // reload monthly totals from DB then renderStats
+    log('done', `✓ ${ev.company} · ${ev.total_stories} stories · Serper $${ev.serper_cost||'0'} · Tavily $${ev.tavily_cost||'0'} · LLM $${ev.llm_cost}`, ev);
+  }
+
+  if (t === 'pipeline_stopped') {
+    setBadge('stopped','Stopped'); setRunning(false);
+    if (searchIdx>=0 && queryData[searchIdx]) queryData[searchIdx].state='pending';
+    renderQueries();
+    log('stopped', `■ Stopped at: ${ev.stage}`, ev);
+  }
+
+  if (t === 'step') {
+    const k = ev.step;
+    if (ev.status === 'start') stepBaseline[k] = runCostTotal;
+    if (ev.status === 'done')  stepCosts[k] = runCostTotal - (stepBaseline[k] || 0);
+    stepState[k] = ev.status==='done'?'done' : ev.status==='start'?'run' : 'err';
+    renderSteps();
+    if (ev.status==='done') {
+      if (k==='area_queries') {
+        queryData = (ev.queries||[]).map(q=>({text:q,state:'pending',count:null}));
+        renderQueries();
+        log('step', `[area queries] ${ev.count} generated · domain: ${ev.domain||'?'}`, ev);
+      } else if (k==='story_queries') {
+        log('step', `[story queries] ${ev.count} generated`, ev);
+        if (ev.queries?.length) ev.queries.forEach(q => log('search', `  → ${q}`, {}));
+      } else if (k==='brave_search') {
+        stats.urls = (stats.urls||0) + (ev.urls_found||0);
+        log('step', `[search] ${ev.urls_found} URLs`, ev);
+      } else if (k==='scraping') {
+        stats.scraped = (stats.scraped||0) + (ev.scraped||0);
+        log('step', `[scraping] ${ev.scraped} pages read`, ev);
+      } else if (k==='knowledge_gather') {
+        const models = (ev.models_responded||[]).join(', ');
+        log('step', `[knowledge] ${models||'none'} responded`, ev);
+        // merged_text not logged — visible in Raw tab
+      } else if (k==='knowledge_refine') {
+        const dropped = ev.dropped_score1 ? ` · −${ev.dropped_score1} generic` : '';
+        log('step', `[refine] ${ev.events||0} events${dropped}`, ev);
+        if (ev.events_structured) {
+          refinedEvents = ev.events_structured;
+          renderRefineChecklist(false);
+          // refineBadge removed
+          document.getElementById('refineInfo').textContent = refinedEvents.length + ' событий';
+        }
+      } else if (k==='analysis') {
+        log('step', `[analysis] ${ev.total_stories} stories found`, ev);
+      } else {
+        log('step', `[${k}] done`, ev);
+      }
+      renderStats();
+    } else if (ev.status==='start') {
+      if (k==='knowledge_refine' && ev.input_lines) {
+        log('step', `[refine] start · ${ev.input_lines} input lines`, ev);
+      } else {
+        log('step', `[${k}] start`, ev);
+      }
+    }
+  }
+
+  if (t === 'search') {
+    if (searchIdx>=0 && queryData[searchIdx]) queryData[searchIdx].state='done';
+    searchIdx = (ev.index||1)-1;
+    if (queryData[searchIdx]) queryData[searchIdx].state='run';
+    renderQueries();
+    log('search', `🔍 [${ev.index}/${ev.total}] ${ev.query}`, ev);
+  }
+
+  if (t === 'search_results') {
+    if (queryData[searchIdx]) { queryData[searchIdx].count=ev.count; renderQueries(); }
+  }
+
+  if (t === 'knowledge_model') {
+    const baseModel = ev.model.replace(/_\d+$/, '');
+    const round = ev.model.match(/_(\d+)$/)?.[1];
+    const modelKey = baseModel==='openai'?'gpt-5.6-luna': baseModel==='claude'?'claude-sonnet-5':
+                     baseModel==='gemini'?'gemini-3.6-flash': baseModel==='haiku'?'claude-haiku-4-5-20251001':
+                     baseModel==='grok'?'grok-4.3': baseModel==='kimi'?'kimi-k2.6':'deepseek-chat';
+    const modelDisp = (MODEL_DISPLAY[modelKey] || baseModel) + (round ? ` #${round}` : '');
+    const areaName = ev.area || modelKey;
+
+    const mc = document.getElementById('modelsContent');
+    if (mc.querySelector('.mc-placeholder')) mc.innerHTML = '';
+
+    // Find or create area section
+    let areaEl = areaSections.get(areaName);
+    if (!areaEl) {
+      areaEl = document.createElement('div');
+      areaEl.style.cssText = 'margin-bottom:22px';
+      const areaHdr = document.createElement('div');
+      areaHdr.style.cssText = 'font-size:14px;font-weight:700;color:var(--text);border-bottom:2px solid var(--accent);padding-bottom:5px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em';
+      areaHdr.textContent = areaName;
+      areaEl.appendChild(areaHdr);
+      areaSections.set(areaName, areaEl);
+      mc.appendChild(areaEl);
+    }
+
+    // Model subsection inside area
+    const modelEl = document.createElement('div');
+    modelEl.style.cssText = 'margin-bottom:14px;padding-left:4px';
+
+    if (ev.unknown || !ev.text) {
+      const h = document.createElement('div');
+      h.style.cssText = 'font-weight:600;color:var(--muted);font-size:13px;margin-bottom:2px';
+      h.textContent = modelDisp + ' — нет данных';
+      modelEl.appendChild(h);
+    } else {
+      const text = ev.text || '';
+      const blocks = [];
+      let cur = null;
+      for (const line of text.split('\n')) {
+        if (line.trim().match(/^ID:/i)) { if (cur) blocks.push(cur); cur = [line]; }
+        else if (cur !== null) { cur.push(line); }
+      }
+      if (cur) blocks.push(cur);
+      const n = blocks.length;
+
+      const h = document.createElement('div');
+      h.style.cssText = 'font-weight:600;font-size:13px;margin-bottom:6px;color:var(--accent)';
+
+      if (n > 0) {
+        const pc = ev.pass_counts;
+        let passStr = '';
+        if (pc && pc.length > 1) {
+          passStr = ' · ' + pc.map((c,i) => i===0 ? `p1:${c}` : `+${c}`).join(' ');
+        }
+        h.textContent = n + ' событий' + passStr;
+        h.style.cssText = 'font-size:12px;color:var(--muted);margin-bottom:8px';
+        modelEl.appendChild(h);
+        totalModelEvents += n;
+        document.getElementById('modelsBadge').textContent = totalModelEvents;
+        console.log('[topics debug] area:', ev.area, 'id_topics:', ev.id_topics, 'keys:', ev.id_topics ? Object.keys(ev.id_topics).length : 0);
+        blocks.forEach((block, i) => {
+          const idLine = block[0]?.trim() || '';
+          const idVal = idLine.replace(/^ID:\s*/i, '');
+          const fields = {};
+          let curKey = null, curVal = [];
+          for (const line of block.slice(1)) {
+            const tk = line.trim();
+            const m = tk.match(/^([A-Z]+):\s*(.*)/);
+            if (m) {
+              if (curKey) fields[curKey] = curVal.join('\n').trim();
+              curKey = m[1]; curVal = [m[2]];
+            } else if (curKey) { if (!tk.match(/^===/) && !tk.startsWith('#')) curVal.push(tk); }
+          }
+          if (curKey) fields[curKey] = curVal.join('\n').trim();
+
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'padding:10px 0;border-top:1px solid var(--border)';
+
+          // A field
+          if (fields['A']) {
+            const d = document.createElement('div');
+            d.style.cssText = 'font-size:13px;line-height:1.6;color:var(--text2);margin-bottom:6px';
+            d.textContent = fields['A'];
+            wrap.appendChild(d);
+          }
+          // I field — insight callout
+          if (fields['I']) {
+            const d = document.createElement('div');
+            d.style.cssText = 'font-size:12px;line-height:1.6;color:var(--text2);background:#f5f3ff;border-left:3px solid #8b5cf6;padding:5px 10px;border-radius:0 6px 6px 0;margin-bottom:6px';
+            const iText = fields['I'];
+            const splitAt = iText.search(/\.\s+[А-ЯA-Z«]/);
+            if (splitAt >= 0) {
+              const first = document.createTextNode(iText.slice(0, splitAt+1) + '\n');
+              const second = document.createElement('strong');
+              second.textContent = iText.slice(splitAt+1).trimStart();
+              d.style.whiteSpace = 'pre-line';
+              d.appendChild(first);
+              d.appendChild(second);
+            } else {
+              d.textContent = iText;
+            }
+            wrap.appendChild(d);
+          }
+          // C field (gray context line)
+          const ctx = fields['C'] || fields['S'] || '';
+          if (ctx) {
+            const d = document.createElement('div');
+            d.style.cssText = 'font-size:12px;color:var(--muted);margin-bottom:4px';
+            d.textContent = ctx;
+            wrap.appendChild(d);
+          }
+          // Q field — Google links
+          if (fields['Q']) {
+            const qs = fields['Q'].split(',')
+              .map(s => {
+                let q = s.replace(/===.*/,'').replace(/###.*/,'').trim();
+                const cutAt = q.search(/Знаю ли|Now focus/);
+                if (cutAt > 0) q = q.slice(0, cutAt).trim();
+                else if (cutAt === 0) q = '';
+                return q;
+              })
+              .filter(s => s && !s.startsWith('===') && !s.startsWith('#') && s.length < 200);
+            if (qs.length) {
+              const d = document.createElement('div');
+              d.style.cssText = 'font-size:12px;display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px';
+              qs.forEach(q => {
+                const a = document.createElement('a');
+                a.href = 'https://www.google.com/search?q=' + encodeURIComponent(q);
+                a.target = '_blank';
+                a.style.cssText = 'color:var(--blue);text-decoration:none';
+                a.textContent = q;
+                a.onmouseenter = () => a.style.textDecoration = 'underline';
+                a.onmouseleave = () => a.style.textDecoration = 'none';
+                d.appendChild(a);
+                if (qs.indexOf(q) < qs.length - 1) {
+                  const sep = document.createElement('span');
+                  sep.style.color = 'var(--border)';
+                  sep.textContent = '·';
+                  d.appendChild(sep);
+                }
+              });
+              wrap.appendChild(d);
+            }
+          }
+          // ID + topic chip + Enrich button row
+          const idRow = document.createElement('div');
+          idRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap';
+          const idEl = document.createElement('div');
+          idEl.style.cssText = 'font-size:11px;color:var(--muted)';
+          idEl.textContent = idVal;
+          idRow.appendChild(idEl);
+          const topicVal = ev.id_topics && ev.id_topics[idVal];
+          if (topicVal) {
+            const tc = document.createElement('span');
+            tc.className = 'chip chip-topic';
+            tc.title = topicVal;
+            tc.textContent = topicVal.split(',')[0].trim();
+            idRow.appendChild(tc);
+          }
+          const spacer = document.createElement('div');
+          spacer.style.flex = '1';
+          idRow.appendChild(spacer);
+          const enrichBtn = document.createElement('button');
+          enrichBtn.textContent = 'Enrich';
+          enrichBtn.style.cssText = 'font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--accent);cursor:pointer';
+          enrichBtn.onclick = () => runEnrich(enrichBtn, {
+            id: idVal, company: ev.company, area: ev.area,
+            C: fields['C']||'', A: fields['A']||'', I: fields['I']||'',
+            Q: (fields['Q']||'').split(',').map(s=>s.replace(/===.*/,'').replace(/###.*/,'').trim()).filter(Boolean)
+          }, wrap);
+          idRow.appendChild(enrichBtn);
+          wrap.appendChild(idRow);
+          modelEl.appendChild(wrap);
+        });
+      } else {
+        // Non-STAR (named_concepts) — term list
+        const terms = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+        h.textContent = modelDisp + ' — ' + terms.length + ' терминов';
+        modelEl.appendChild(h);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'margin-top:4px;padding-left:8px;border-left:2px solid var(--border);display:flex;flex-direction:column;gap:2px';
+        terms.forEach(line => {
+          const d = document.createElement('div');
+          d.style.cssText = 'font-size:13px;color:var(--text2);line-height:1.6';
+          d.textContent = line.trim().replace(/^[-•]\s*/, '');
+          wrap.appendChild(d);
+        });
+        modelEl.appendChild(wrap);
+      }
+    }
+    areaEl.appendChild(modelEl);
+    log('llm_call', `${areaName} · ${modelDisp}`, ev);
+  }
+
+  if (t === 'pipeline_paused') {
+    setBadge('paused', 'Paused');
+    if (ev.stage === 'before_merge') {
+      document.getElementById('continueBar').style.display = 'flex';
+      switchTab('models');
+    } else {
+      renderRefineChecklist(true);
+      document.getElementById('refineSelectActions').style.display = 'flex';
+      document.getElementById('refineContinueBar').style.display = 'flex';
+      updateSearchSelectedBtn();
+      switchTab('models');
+    }
+  }
+
+  if (t === 'pipeline_resumed') {
+    document.getElementById('refineSelectActions').style.display = 'none';
+    document.getElementById('continueBar').style.display = 'none';
+    document.getElementById('refineContinueBar').style.display = 'none';
+  }
+
+  if (t === 'log')        log('step',      ev.msg || JSON.stringify(ev), ev);
+  if (t === 'scrape')     log('scrape',    `📄 [${ev.index}/${ev.total}] ${ev.url}`, ev);
+  if (t === 'scrape_done') log(ev.ok?'scrape_ok':'scrape_done', `  ${ev.ok?'✓':'✗'} ${ev.chars}ch  ${ev.url}`, ev);
+  if (t === 'llm_call')   log('llm_call',  `🤖 LLM chunk ${ev.chunk}/${ev.total_chunks} · ${Math.round(ev.content_chars/1000)}k chars`, ev);
+  if (t === 'llm_done')   log('llm_done',  `  → ${ev.stories_found} stories (chunk ${ev.chunk})`, ev);
+  if (t === 'analysis_chunks') log('step', `Analysis: ${ev.chunks} chunks`, ev);
+
+  if (t === 'story_found') {
+    stats.stories++;
+    areaCounts[ev.area] = (areaCounts[ev.area]||0)+1;
+    // storiesBadge removed
+    document.getElementById('storyCountLbl').textContent = stats.stories+' stories collected';
+    addStoryCard(ev);
+    renderStats(); renderAreas();
+  }
+
+  if (t === 'api_call') {
+    if (ev.api==='brave') {
+      runCostTotal += ev.call_cost || 0.003;
+      braveTotal = ev.total;
+      sessBraveCost = runBraveOffset + braveTotal * 0.003;
+      saveSess();
+    }
+    if (ev.api==='tavily') {
+      runCostTotal += ev.call_cost || 0.008;
+      tavilyTotal = ev.total;
+    }
+    if (ev.api==='serper') {
+      runCostTotal += ev.call_cost || 0.001;
+      serperTotal = ev.total;
+    }
+    if (ev.api==='jina') {
+      jinaTotal = ev.total;
+      sessJinaCalls = runJinaOffset + jinaTotal;
+      saveSess();
+    }
+    if (ev.api==='grounding') {
+      groundingTotal = ev.total;
+    }
+    renderStats();
+  }
+
+  if (t === 'api_quota') {
+    if (ev.api==='brave') {
+      braveQuota = ev.quota;
+      const rem = ev.quota.remaining;
+      if (rem != null) log('api', `Brave quota: ${ev.calls} used · ${rem} remaining`, ev);
+    }
+    if (ev.api==='jina') {
+      jinaQuota = ev.quota;
+      const rem = ev.quota.remaining ?? ev.quota['remaining-requests'];
+      if (rem != null) log('api', `Jina quota: ${ev.calls} used · ${rem} remaining`, ev);
+    }
+    renderStats();
+  }
+
+  if (t === 'tokens') {
+    runCostTotal += ev.call_cost || 0;
+    llmIn=ev.total_in; llmOut=ev.total_out; llmCost=ev.total_cost;
+    sessLLMCost = runLLMOffset + llmCost;
+    sessLLMIn   = runLLMInOffset + llmIn;
+    sessLLMOut  = runLLMOutOffset + llmOut;
+    saveSess();
+    renderStats();
+    renderModelBreakdown(ev.by_model || {});
+    const i=ev.in>=1000?(ev.in/1000).toFixed(1)+'k':ev.in;
+    const o=ev.out>=1000?(ev.out/1000).toFixed(1)+'k':ev.out;
+    const mdl = ev.model ? ` [${ev.model.replace('gpt-','').replace('claude-','').replace('gemini-','')}]` : '';
+    log('tokens', `💰${mdl} in:${i} out:${o} · +$${ev.call_cost} · run $${ev.total_cost} · total $${sessLLMCost.toFixed(4)}`, ev);
+  }
+
+  if (t === 'pipeline_stopped' || t === 'pipeline_done') {
+    document.getElementById('refineSelectActions').style.display = 'none';
+  }
+
+  if (t === 'error') {
+    setBadge('error','Error'); setRunning(false);
+    const cur=Object.entries(stepState).find(([,v])=>v==='run');
+    if (cur) { stepState[cur[0]]='err'; renderSteps(); }
+    log('error', `⚠ ${ev.msg||JSON.stringify(ev)}`, ev);
+  }
+
+  if (t === 'warn') {
+    log('error', `⚡ WARN ${ev.step||''}: status=${ev.status||''} keys=${JSON.stringify(ev.response_keys||[])} ${ev.detail||''}`, ev);
+  }
+}
+
+function toggleAllAreas(cb) {
+  document.querySelectorAll('#groupCheckboxes input[type=checkbox]').forEach(el => el.checked = cb.checked);
+}
+function updateAreasSelectAll() {
+  const all = document.querySelectorAll('#groupCheckboxes input[type=checkbox]');
+  const n = document.querySelectorAll('#groupCheckboxes input[type=checkbox]:checked').length;
+  const sa = document.getElementById('selectAllAreas');
+  sa.indeterminate = n > 0 && n < all.length;
+  sa.checked = n === all.length;
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+async function startRun() {
+  const company=document.getElementById('company').value.trim();
+  if (!company) { alert('Enter company name'); return; }
+  const n=15;
+  const checkedGroups=[...document.querySelectorAll('#groupCheckboxes input:checked')].map(cb=>cb.value);
+  if (!checkedGroups.length) { alert('Select at least one group'); return; }
+  const active_groups = checkedGroups.length===16 ? null : checkedGroups;
+  const active_models = document.getElementById('modelSelect').value.split(',');
+  // clear Models + Refine tabs
+  areaSections = new Map();
+  totalModelEvents = 0;
+  document.getElementById('modelsContent').innerHTML='<span class="mc-placeholder" style="color:var(--muted)">Model knowledge dump will appear here…</span>';
+  document.getElementById('modelsBadge').textContent='0';
+  document.getElementById('continueBar').style.display='none';
+  document.getElementById('refineContinueBar').style.display='none';
+  refinedEvents = [];
+  document.getElementById('refineContent').innerHTML='<span style="color:var(--muted)">Deduplicated event list will appear here after refine step…</span>';
+  // refineBadge removed
+  document.getElementById('refineSelectActions').style.display='none';
+  const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company,llm:'gpt4o-mini',n_queries:n,active_groups,active_models})});
+  const d=await r.json();
+  if (d.error) { alert(d.error); return; }
+  setRunning(true);
+}
+async function stopRun() {
+  document.getElementById('stopBtn').disabled=true;
+  document.getElementById('stopBtn').textContent='■  Stopping…';
+  await fetch('/api/stop',{method:'POST'});
+}
+async function continuePipeline() {
+  document.getElementById('continueBar').style.display='none';
+  document.getElementById('refineContinueBar').style.display='none';
+  await fetch('/api/continue',{method:'POST'});
+}
+
+let refinedEvents = [];
+
+function renderRefineChecklist(withCheckboxes) {
+  const rc = document.getElementById('refineContent');
+  rc.innerHTML = '';
+  if (!refinedEvents.length) return;
+  refinedEvents.forEach((ev, i) => {
+    const d = document.createElement('div');
+    d.className = 'refine-item';
+    if (withCheckboxes) {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'refine-check';
+      cb.dataset.idx = i;
+      cb.checked = true;
+      cb.addEventListener('change', updateSearchSelectedBtn);
+      d.appendChild(cb);
+    }
+    const body = document.createElement('div');
+    body.className = 'refine-item-body';
+    const title = document.createElement('div');
+    title.className = 'refine-title';
+    title.style.cssText = 'display:flex;align-items:center;gap:6px';
+    const titleText = document.createElement('span');
+    titleText.textContent = (i+1) + '. ' + ev.title;
+    title.appendChild(titleText);
+    if (ev.score) {
+      const scoreBadge = document.createElement('span');
+      const s = ev.score;
+      scoreBadge.textContent = '★'.repeat(s);
+      scoreBadge.style.cssText = `font-size:10px;letter-spacing:-1px;flex-shrink:0;color:${s===3?'#16a34a':s===2?'#ca8a04':'#9ca3af'}`;
+      title.appendChild(scoreBadge);
+    }
+    body.appendChild(title);
+    if (ev.summary_ru) {
+      const sum = document.createElement('div');
+      sum.className = 'refine-summary';
+      sum.textContent = ev.summary_ru;
+      body.appendChild(sum);
+    }
+    d.appendChild(body);
+    rc.appendChild(d);
+  });
+}
+
+function updateSearchSelectedBtn() {
+  const n = document.querySelectorAll('.refine-check:checked').length;
+  const btn = document.getElementById('searchSelectedBtn');
+  if (btn) btn.textContent = `Искать (${n}) →`;
+}
+
+function toggleAllRefine(checked) {
+  document.querySelectorAll('.refine-check').forEach(cb => cb.checked = checked);
+  updateSearchSelectedBtn();
+}
+
+async function searchSelected() {
+  const selected = [];
+  document.querySelectorAll('.refine-check:checked').forEach(cb => {
+    const idx = parseInt(cb.dataset.idx);
+    if (refinedEvents[idx]) selected.push(refinedEvents[idx].title);
+  });
+  document.getElementById('refineSelectActions').style.display = 'none';
+  renderRefineChecklist(false);
+  await fetch('/api/continue', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({selected_events: selected})
+  });
+}
+
+// ── SSE ───────────────────────────────────────────────────────────────────────
+function connect() {
+  if (window._es) { try { window._es.close(); } catch {} }
+  const es = window._es = new EventSource('/api/stream');
+  es.onmessage=e=>{ try{ handle(JSON.parse(e.data)); }catch{} };
+  es.onerror=()=>{ try { es.close(); } catch {} setTimeout(connect,3000); };
+}
+connect(); renderSteps(); renderModelBreakdown({}); renderStats();
+
+// ── Main tab switching ─────────────────────────────────────────────────────
+function switchMainTab(tab) {
+  ['search','stories','how'].forEach(t => {
+    document.getElementById('nav'+t[0].toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
+  });
+  const isSearch = tab === 'search';
+  document.querySelector('.layout').style.display       = isSearch ? 'grid'  : 'none';
+  document.getElementById('mainStories').style.display  = tab==='stories' ? 'block' : 'none';
+  document.getElementById('mainHow').style.display      = tab==='how'     ? 'block' : 'none';
+  if (tab==='stories') loadBrowserMeta();
+}
+
+// ── Inline story browser ──────────────────────────────────────────────────
+let bPage = 1, bTimer = null, bExpanded = new Set();
+const B_PER_PAGE = 30;
+
+function debounceStories() { clearTimeout(bTimer); bTimer = setTimeout(loadBrowserStories, 300); }
+
+async function loadBrowserMeta() {
+  const [cs, as] = await Promise.all([
+    fetch('/api/companies').then(r=>r.json()),
+    fetch('/api/areas').then(r=>r.json()),
+  ]);
+  const ce = document.getElementById('bCompany');
+  const ae = document.getElementById('bArea');
+  if (ce.options.length < 2) {
+    ce.innerHTML = '<option value="">All companies</option>';
+    cs.forEach(c => ce.appendChild(new Option(c,c)));
+  }
+  if (ae.options.length < 2) {
+    ae.innerHTML = '<option value="">All areas</option>';
+    as.forEach(a => ae.appendChild(new Option(a,a)));
+  }
+  loadBrowserStories();
+}
+
+async function loadBrowserStories() {
+  bPage = 1;
+  const q = document.getElementById('bSearch').value.trim();
+  const company = document.getElementById('bCompany').value;
+  const area = document.getElementById('bArea').value;
+  const params = new URLSearchParams({page: bPage, per_page: B_PER_PAGE, sort:'created_at', order:'desc'});
+  if (q) params.set('q', q);
+  if (company) params.set('company', company);
+  if (area) params.set('area', area);
+  const data = await fetch('/api/stories?' + params).then(r=>r.json());
+  document.getElementById('bTotal').textContent = data.total + ' stories';
+  document.getElementById('bGrid').innerHTML = data.stories.length
+    ? data.stories.map(s => bCard(s)).join('')
+    : '<div style="color:var(--muted);text-align:center;padding:40px">No stories found</div>';
+  renderBPagination(data.total);
+}
+
+function bCard(s) {
+  const urls = (() => { try { return JSON.parse(s.source_urls||'[]'); } catch { return []; } })();
+  const exp = bExpanded.has(s.id);
+  return `<div class="s-card" onclick="bToggle(${s.id},this)">
+    <div class="s-header">
+      <span class="chip chip-area">${esc(s.area)}</span>
+      <span class="chip chip-id">${esc(s.story_id||'')}</span>
+      <span style="margin-left:auto;font-size:12px;color:var(--muted)">${esc(s.company)}</span>
+    </div>
+    <div class="s-principle">${esc(s.principle||'')}</div>
+    <div class="card-body${exp?' open':''}" style="${exp?'':'display:none'}">
+      ${bRow('Story', s.situation)}${bRow('Mechanism', s.task)}${bRow('Terms', s.action)}
+      ${urls.length?`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Sources: ${urls.slice(0,3).map(u=>`<a href="${esc(u)}" target="_blank" style="color:var(--muted)">${esc(u.length>50?u.slice(0,50)+'…':u)}</a>`).join(' · ')}</div>`:''}
+    </div>
+  </div>`;
+}
+
+function bRow(lbl, val) {
+  if (!val||!val.trim()) return '';
+  return `<div class="star-row" style="display:grid;grid-template-columns:90px 1fr;gap:6px 14px;margin-top:10px"><span style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding-top:3px">${lbl}</span><span style="font-size:14px;line-height:1.65;color:var(--text2);white-space:pre-wrap">${esc(val)}</span></div>`;
+}
+
+function bToggle(id, el) {
+  const body = el.querySelector('.card-body');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  if (open) bExpanded.add(id); else bExpanded.delete(id);
+}
+
+function renderBPagination(total) {
+  const pages = Math.ceil(total / B_PER_PAGE);
+  if (pages <= 1) { document.getElementById('bPagination').innerHTML = ''; return; }
+  let html = `<button onclick="bGoPage(${bPage-1})" ${bPage===1?'disabled':''} style="padding:6px 14px;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:7px;cursor:pointer">← Prev</button>`;
+  html += `<span style="font-size:14px;color:var(--muted);padding:0 8px">Page ${bPage} / ${pages}</span>`;
+  html += `<button onclick="bGoPage(${bPage+1})" ${bPage>=pages?'disabled':''} style="padding:6px 14px;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:7px;cursor:pointer">Next →</button>`;
+  document.getElementById('bPagination').innerHTML = html;
+}
+
+async function bGoPage(p) {
+  bPage = p;
+  const q = document.getElementById('bSearch').value.trim();
+  const company = document.getElementById('bCompany').value;
+  const area = document.getElementById('bArea').value;
+  const params = new URLSearchParams({page: bPage, per_page: B_PER_PAGE, sort:'created_at', order:'desc'});
+  if (q) params.set('q', q);
+  if (company) params.set('company', company);
+  if (area) params.set('area', area);
+  const data = await fetch('/api/stories?' + params).then(r=>r.json());
+  document.getElementById('bGrid').innerHTML = data.stories.map(s => bCard(s)).join('');
+  renderBPagination(data.total);
+  document.getElementById('mainStories').scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
