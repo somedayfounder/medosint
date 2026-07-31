@@ -94,29 +94,34 @@ def run_block_search_first(analysis: str, block_id: int, model: str) -> dict:
     # Step 4 — strong model writes the block from clean facts
     print(f"[search-first] Генерируем блок ({GENERATE_MODEL})…")
     block_raw, usage_gen = _generate_block_from_facts(analysis, block, facts_raw, sources, GENERATE_MODEL)
-    cost_gen = estimate_cost(usage_gen, model)
+    cost_gen = estimate_cost(usage_gen, GENERATE_MODEL)
     total_cost += cost_gen
     for k, v in usage_gen.items():
         total_usage[k] = total_usage.get(k, 0) + v
     print(f"[search-first] Готово, стоимость: ${cost_gen:.6f}")
 
     return {
-        "id":           block_id,
-        "name":         block["name"],
-        "section":      block["section"],
-        "pass_group":   block["pass_group"],
-        "format":       block["format"],
-        "content":      block_raw.strip(),
-        "confidence":   "high",
-        "needs_verify": False,
-        "verified":     True,
-        "sources":      [s["url"] for s in sources],
-        "warnings":     [],
-        "fact_cards":   [],
+        "id":             block_id,
+        "name":           block["name"],
+        "section":        block["section"],
+        "pass_group":     block["pass_group"],
+        "format":         block["format"],
+        "content":        block_raw.strip(),
+        "confidence":     "high",
+        "needs_verify":   False,
+        "verified":       True,
+        "sources":        [s["url"] for s in sources],
+        "search_queries": queries,
+        "search_results": [
+            {"url": s["url"], "title": s["title"], "snippet": s["snippet"]}
+            for s in sources
+        ],
+        "extracted_facts": facts_raw.strip(),
+        "warnings":       [],
+        "fact_cards":     [],
         "verify_queries": [q.format(analysis=analysis) for q in block.get("verify_queries", [])],
-        "_search_queries": queries,
-        "_usage":       total_usage,
-        "_cost":        total_cost,
+        "_usage":         total_usage,
+        "_cost":          total_cost,
     }
 
 

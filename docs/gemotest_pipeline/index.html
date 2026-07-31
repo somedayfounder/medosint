@@ -640,6 +640,12 @@ function renderResult(data) {
     const section = sectionEls[b.section] || sectionEls['b2c'];
     blocksFilled++;
 
+    // Log search activity for search-first blocks
+    if (b.search_queries && b.search_queries.length) {
+      b.search_queries.forEach(q => addLog('step', `Serper: ${q}`));
+      (b.search_results || []).forEach(r => addLog('info', `Tavily: ${r.url}`));
+    }
+
     const confClass = { high: 'chip-high', medium: 'chip-medium', low: 'chip-low' }[b.confidence] || 'chip-medium';
     const confLabel = { high: 'High', medium: 'Medium', low: 'Low' }[b.confidence] || (b.confidence || '?');
     const vChip = b.verified
@@ -656,10 +662,37 @@ function renderResult(data) {
 
     const warningsHtml = (b.warnings || []).map(w => `<div class="warning-item">${esc(w)}</div>`).join('');
 
-    const factCardsHtml = b.fact_cards && b.fact_cards.length
-      ? `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:600;list-style:none">Факт-карточки (${b.fact_cards.length})</summary>
-           ${b.fact_cards.map(fc => `<div class="fact-card-body">${esc(fc.card || String(fc))}</div>`).join('')}
-         </details>`
+    // Search details collapsible (for search-first blocks)
+    const searchHtml = b.search_queries && b.search_queries.length
+      ? (() => {
+          const qHtml = b.search_queries.map(q =>
+            `<div style="font-size:12px;font-family:var(--mono);color:var(--blue);padding:1px 0">▸ ${esc(q)}</div>`
+          ).join('');
+          const srHtml = (b.search_results || []).map(r =>
+            `<div style="margin-top:6px">
+               <a href="${esc(r.url)}" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:none;font-weight:600">${esc(r.title || r.url)}</a>
+               ${r.snippet ? `<div style="font-size:11px;color:var(--muted);margin-top:1px">${esc(r.snippet)}</div>` : ''}
+             </div>`
+          ).join('');
+          const factsHtml = b.extracted_facts
+            ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+                 <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px">Извлечённые факты</div>
+                 <div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.5">${esc(b.extracted_facts)}</div>
+               </div>`
+            : '';
+          return `<details style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+            <summary style="cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;list-style:none;display:flex;align-items:center;gap:6px">
+              ▸ Поиск · ${(b.search_results||[]).length} страниц
+            </summary>
+            <div style="margin-top:8px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px">Serper-запросы</div>
+              ${qHtml}
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:8px;margin-bottom:4px">Страницы</div>
+              ${srHtml}
+              ${factsHtml}
+            </div>
+          </details>`;
+        })()
       : '';
 
     const card = document.createElement('div');
@@ -672,7 +705,7 @@ function renderResult(data) {
         ${vChip}
       </div>
       <div class="block-content">${renderContent(b.content || '')}</div>
-      ${sourcesHtml}${warningsHtml}${factCardsHtml}
+      ${sourcesHtml}${warningsHtml}${searchHtml}
     `;
     section.appendChild(card);
   });
