@@ -539,6 +539,7 @@ let logCount = 0, autoScroll = true;
 let currentAnalysis = '';
 let pollTimer = null;
 let currentRunId = null;
+let lastLoggedStatus = null;
 let startedAt = null;
 let sectionEls = {};
 let blocksFilled = 0, blocksTotal = 0, blocksVerified = 0;
@@ -822,13 +823,19 @@ async function poll() {
     if (run.status === 'in_progress') {
       document.getElementById('runStatus').textContent = `⏳ ${currentAnalysis} · выполняется…`;
       setStatus('run', 'Running');
-      addLog('step', 'Actions: in_progress');
+      if (lastLoggedStatus !== 'in_progress') {
+        addLog('step', 'Actions: in_progress');
+        lastLoggedStatus = 'in_progress';
+      }
       pollTimer = setTimeout(poll, 5000);
       return;
     }
 
     if (run.status === 'queued') {
-      addLog('step', 'Actions: queued');
+      if (lastLoggedStatus !== 'queued') {
+        addLog('step', 'Actions: queued');
+        lastLoggedStatus = 'queued';
+      }
       pollTimer = setTimeout(poll, 4000);
       return;
     }
@@ -904,9 +911,10 @@ async function startRun() {
   const analysis = document.getElementById('analysisInput').value.trim();
   if (!analysis) { alert('Введите название анализа'); return; }
 
-  currentAnalysis = analysis;
-  currentRunId    = null;
-  startedAt       = new Date();
+  currentAnalysis  = analysis;
+  currentRunId     = null;
+  lastLoggedStatus = null;
+  startedAt        = new Date();
   if (pollTimer) clearTimeout(pollTimer);
 
   initSections();
