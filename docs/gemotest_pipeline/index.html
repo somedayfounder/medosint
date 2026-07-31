@@ -215,6 +215,27 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
 .recent-date { font-size:11px; color:var(--muted); }
 .recent-dot  { width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0; }
 
+/* Info icon + popup */
+.info-btn {
+  width:16px; height:16px; border-radius:50%; border:1.5px solid var(--muted);
+  background:none; cursor:pointer; font-size:10px; font-weight:700; color:var(--muted);
+  display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+  line-height:1; padding:0; font-family:serif;
+}
+.info-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+.info-popup {
+  position:fixed; z-index:1000; background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.14); padding:12px 14px;
+  max-width:300px; font-size:12px; line-height:1.55; color:var(--text2);
+  display:none; pointer-events:none;
+}
+.info-popup.visible { display:block; }
+.info-popup-title { font-weight:700; color:var(--text); font-size:13px; margin-bottom:5px; }
+.info-popup-section { font-size:11px; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+.block-llm { color:var(--green); font-size:9px; font-weight:700; text-transform:uppercase; }
+.block-platform { color:var(--muted); font-size:9px; font-weight:700; text-transform:uppercase; }
+
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
 .shimmer {
@@ -348,36 +369,75 @@ const SECTIONS = [
   { key: 'geo', label: 'GEO / SEO' },
 ];
 
-// All 28 LLM blocks grouped by section
+// Descriptions per block (from blocks_config.py)
+const BLOCK_DESC = {
+  1:  'Первый абзац страницы. 2–3 предложения: что это, зачем делается, кому назначают, какова норма. Самодостаточный ответ — LLM и поисковик вырежет именно его.',
+  2:  'Компактная таблица-карточка с техническими параметрами: биоматериал, метод, чувствительность, единицы, код МЗ РФ, срок выполнения.',
+  3:  'Референсные значения по демографическим группам: взрослые м/ж, дети по возрастам, беременные по триместрам, пожилые. Самый верифицируемый блок.',
+  4:  'Обратная связь: симптом → зачем этот анализ. Закрывает запрос «у меня усталость, что сдать».',
+  5:  'Интерпретация результатов: повышен/понижен + градации (лёгкое/умеренное/выраженное) + причины по категориям. У конкурентов нет градаций.',
+  6:  'Правила подготовки к сдаче в формате Q&A. Реальные вопросы: натощак?, во время месячных?, биотин?, таблетки?',
+  7:  'FAQ: 7–10 реальных вопросов пациентов с развёрнутыми ответами об интерпретации, значимости, частоте сдачи.',
+  8:  '5–7 распространённых мифов о данном анализе с опровержением. Уникальный блок — ни у кого из конкурентов нет.',
+  9:  'Таблица: препарат / как влияет на результат / за сколько часов отменять. Обязательно: биотин, Л-тироксин, амиодарон.',
+  10: 'Сравнительная таблица: данный анализ vs похожие. Что показывает каждый, когда назначают первым.',
+  11: 'Что делать с результатом: норма → повторить через N. Повышен → следующие анализы, к какому врачу. Практический алгоритм.',
+  12: 'Беременные (по триместрам), дети, 40+, мужчины — свои нормы, когда проверять, нюансы интерпретации.',
+  13: 'Короткие фактические фразы, которые LLM легко процитирует дословно. Уникальный GEO-блок — ни у кого нет.',
+  15: 'Карточки комплексов + рекомендация «если повышен — сдайте ещё X». Навигация к смежным анализам.',
+  16: 'Ключевые фразы и факты из авторитетных источников, пригодные для прямого цитирования в тексте.',
+  17: 'Клинические рекомендации, PubMed-ссылки. Обновить до 2022–2026. Нужны полные цитаты с URL.',
+  18: '150–160 символов. Самодостаточный ответ с нормой и ценой. Не шаблон «Анализ крови на X — сдать в Москве».',
+  19: 'MedicalTest + FAQPage + BreadcrumbList + Offer в JSON-LD. Ни у кого из конкурентов нет.',
+  20: 'Варианты H1-заголовка и title для A/B-теста. Включают числа норм, ключевые слова, призыв.',
+  24: 'Метод (ECLIA/ИФА/…), поколение (3-е), аналитическая чувствительность, прибор (Roche cobas). Для врачей и МИС.',
+  25: 'Интерференция, ложные результаты, nonthyroidal illness, гетерофильные антитела. Аналитические ограничения.',
+  26: 'Алгоритм диагностики, пороги лечения, мониторинг терапии по актуальным гайдлайнам (МЗ РФ, ATA, ETA).',
+  27: 'Пробирка, объём, стабильность (температура/срок), причины отбраковки. Для лабораторных специалистов.',
+  29: 'LOINC, CPT, код МЗ РФ (804н) — для МИС и биллинга.',
+  32: 'Биологическое описание: что это, где вырабатывается, механизм регуляции, физиологическая роль. Высоко на странице.',
+  33: 'Все варианты названия: русские, английские, аббревиатуры, поколения метода. Нужно для SEO.',
+  34: 'Что будет: приходите → регистрация → забор крови (3–5 мин) → результат в личном кабинете через N часов.',
+  40: 'Когда нельзя или бессмысленно сдавать: острое заболевание, после контраста с йодом, возрастные ограничения.',
+  44: 'Одна строка под H1. Видна в каталоге и поисковом превью. Формула: выгода или страх + действие.',
+  46: 'Клинические показания к назначению: диагностика, скрининг, мониторинг терапии, дифференциальная диагностика.',
+};
+
+// All blocks (LLM-generated blocks + display-only)
 const ALL_BLOCKS = [
-  { id:1,  name:'Прямой ответ (Citation Bait)',     section:'b2c' },
-  { id:2,  name:'Ключевые факты (карточка)',         section:'b2c' },
-  { id:3,  name:'Нормы',                             section:'b2c' },
-  { id:4,  name:'При каких жалобах назначают',       section:'b2c' },
-  { id:5,  name:'Интерпретация с градациями',        section:'b2c' },
-  { id:6,  name:'Подготовка (FAQ-формат)',            section:'b2c' },
-  { id:7,  name:'FAQ — вопросы пациентов',           section:'b2c' },
-  { id:8,  name:'Мифы и заблуждения',               section:'b2c' },
-  { id:9,  name:'Лекарства (таблица)',               section:'b2c' },
-  { id:10, name:'Сравнение с похожими анализами',   section:'b2c' },
-  { id:11, name:'Путь пациента',                    section:'b2c' },
-  { id:12, name:'Особенности для групп',            section:'b2c' },
-  { id:15, name:'Связанные анализы',                section:'b2c' },
-  { id:34, name:'Процесс сдачи',                    section:'b2c' },
-  { id:40, name:'Противопоказания',                 section:'b2c' },
-  { id:44, name:'Краткое описание (hook)',           section:'b2c' },
-  { id:46, name:'Зачем сдавать (показания)',        section:'b2c' },
-  { id:24, name:'Методология',                      section:'b2b' },
-  { id:25, name:'Ограничения метода',               section:'b2b' },
-  { id:26, name:'Клиническое руководство',          section:'b2b' },
-  { id:27, name:'Требования к образцу',             section:'b2b' },
-  { id:16, name:'Цитируемые факты',                 section:'b2b' },
-  { id:32, name:'Полное описание',                  section:'geo' },
-  { id:33, name:'Синонимы',                         section:'geo' },
-  { id:17, name:'Источники',                        section:'geo' },
-  { id:18, name:'Meta description',                 section:'geo' },
-  { id:19, name:'Schema markup',                    section:'geo' },
-  { id:20, name:'H1 / Title варианты',              section:'geo' },
+  // B2C
+  { id:44, name:'Краткое описание (hook)',           section:'b2c', llm:true  },
+  { id:1,  name:'Прямой ответ (Citation Bait)',      section:'b2c', llm:true  },
+  { id:32, name:'Полное описание',                   section:'b2c', llm:true  },
+  { id:46, name:'Зачем сдавать (показания)',         section:'b2c', llm:true  },
+  { id:2,  name:'Ключевые факты (карточка)',          section:'b2c', llm:true  },
+  { id:3,  name:'Нормы',                             section:'b2c', llm:true  },
+  { id:12, name:'Особенности для групп',             section:'b2c', llm:true  },
+  { id:5,  name:'Интерпретация с градациями',        section:'b2c', llm:true  },
+  { id:11, name:'Путь пациента',                     section:'b2c', llm:true  },
+  { id:4,  name:'При каких жалобах назначают',       section:'b2c', llm:true  },
+  { id:40, name:'Противопоказания',                  section:'b2c', llm:true  },
+  { id:6,  name:'Подготовка (FAQ-формат)',            section:'b2c', llm:true  },
+  { id:34, name:'Процесс сдачи',                    section:'b2c', llm:true  },
+  { id:9,  name:'Лекарства (таблица)',               section:'b2c', llm:true  },
+  { id:7,  name:'FAQ — вопросы пациентов',           section:'b2c', llm:true  },
+  { id:8,  name:'Мифы и заблуждения',               section:'b2c', llm:true  },
+  { id:10, name:'Сравнение с похожими анализами',   section:'b2c', llm:true  },
+  { id:15, name:'Связанные анализы',                 section:'b2c', llm:true  },
+  { id:33, name:'Синонимы',                          section:'b2c', llm:true  },
+  // B2B
+  { id:24, name:'Методология',                       section:'b2b', llm:true  },
+  { id:25, name:'Ограничения метода',                section:'b2b', llm:true  },
+  { id:26, name:'Клиническое руководство',           section:'b2b', llm:true  },
+  { id:27, name:'Требования к образцу',              section:'b2b', llm:true  },
+  { id:29, name:'Коды (LOINC, МЗ РФ, CPT)',         section:'b2b', llm:true  },
+  { id:16, name:'Цитируемые факты',                  section:'b2b', llm:true  },
+  // GEO
+  { id:13, name:'Якорные утверждения',              section:'geo',  llm:true  },
+  { id:17, name:'Источники',                         section:'geo',  llm:true  },
+  { id:18, name:'Meta description',                  section:'geo',  llm:true  },
+  { id:19, name:'Schema markup',                     section:'geo',  llm:true  },
+  { id:20, name:'H1 / Title варианты',              section:'geo',  llm:true  },
 ];
 
 function initBlockChecklist() {
@@ -390,17 +450,52 @@ function initBlockChecklist() {
   ];
   groups.forEach(g => {
     const blocks = ALL_BLOCKS.filter(b => b.section === g.key);
+    if (!blocks.length) return;
     html += `<div style="padding:6px 16px 2px;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;text-transform:uppercase">${g.label}</div>`;
     blocks.forEach(b => {
-      html += `<label style="display:flex;align-items:center;gap:8px;padding:4px 16px;cursor:pointer;font-size:13px;color:var(--text2);line-height:1.3">
-        <input type="checkbox" data-block="${b.id}" style="width:14px;height:14px;accent-color:var(--accent);flex-shrink:0" />
+      const hasDesc = !!BLOCK_DESC[b.id];
+      const infoBtn = hasDesc
+        ? `<button class="info-btn" data-id="${b.id}" onclick="showInfo(event,${b.id})" title="Описание блока">i</button>`
+        : `<span style="width:16px;flex-shrink:0"></span>`;
+      html += `<label style="display:flex;align-items:center;gap:6px;padding:4px 16px;cursor:pointer;font-size:13px;color:var(--text2);line-height:1.3">
+        <input type="checkbox" data-block="${b.id}" style="width:14px;height:14px;accent-color:var(--accent);flex-shrink:0" checked />
+        ${infoBtn}
         <span style="color:var(--muted);font-family:var(--mono);font-size:11px;flex-shrink:0">${b.id}</span>
-        ${esc(b.name)}
+        <span style="flex:1">${esc(b.name)}</span>
       </label>`;
     });
   });
   el.innerHTML = html;
 }
+
+// ── Info popup ────────────────────────────────────────────────────────────────
+const _popup = (() => {
+  const el = document.createElement('div');
+  el.className = 'info-popup';
+  document.body.appendChild(el);
+  document.addEventListener('click', e => {
+    if (!e.target.classList.contains('info-btn')) hideInfo();
+  });
+  return el;
+})();
+
+function showInfo(e, id) {
+  e.stopPropagation();
+  const b = ALL_BLOCKS.find(x => x.id === id);
+  const desc = BLOCK_DESC[id] || '';
+  const sectionLabel = { b2c:'B2C', b2b:'B2B', geo:'GEO' }[b.section] || b.section;
+  _popup.innerHTML = `
+    <div class="info-popup-section">${sectionLabel} · блок ${id}</div>
+    <div class="info-popup-title">${esc(b.name)}</div>
+    <div>${esc(desc)}</div>
+  `;
+  const rect = e.target.getBoundingClientRect();
+  _popup.style.top  = (rect.bottom + 6) + 'px';
+  _popup.style.left = Math.min(rect.left, window.innerWidth - 320) + 'px';
+  _popup.classList.add('visible');
+}
+
+function hideInfo() { _popup.classList.remove('visible'); }
 
 function getSelectedBlocks() {
   return [...document.querySelectorAll('#blockChecklist input[type=checkbox]:checked')]
@@ -763,7 +858,7 @@ async function startRun() {
   document.getElementById('jobStatus').innerHTML = '<div style="font-size:13px;color:var(--muted)"><span class="shimmer">Запускаем workflow…</span></div>';
   setStatus('run', 'Running');
   setRunning(true);
-  addLog('start', `▶ ${analysis}` + (document.getElementById('complexInput').value ? ' + ' + document.getElementById('complexInput').value : ''));
+  addLog('start', `▶ ${analysis}`);
 
   const ok = await triggerWorkflow({
     analysis_name:  analysis,
