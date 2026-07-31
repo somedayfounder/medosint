@@ -239,9 +239,6 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
       <label>Анализ</label>
       <input id="analysisInput" type="text" placeholder="напр. ТТГ" />
 
-      <label>Комплекс (опционально)</label>
-      <input id="complexInput" type="text" placeholder="Т4св, АТ-ТПО" />
-
       <label>Модель</label>
       <select id="modelSelect">
         <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
@@ -770,7 +767,7 @@ async function startRun() {
 
   const ok = await triggerWorkflow({
     analysis_name:  analysis,
-    complex_names:  document.getElementById('complexInput').value.trim(),
+
     blocks:         getSelectedBlocks(),
     model:          document.getElementById('modelSelect').value,
   });
