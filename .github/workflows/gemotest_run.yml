@@ -1,0 +1,53 @@
+name: Gemotest Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      analysis_name:
+        description: "Название анализа (напр. ТТГ)"
+        required: true
+      complex_names:
+        description: "Комплекс (опционально)"
+        required: false
+        default: ""
+      blocks:
+        description: "ID блоков через запятую (пусто = все)"
+        required: false
+        default: ""
+      model:
+        description: "Модель Gemini"
+        required: false
+        default: "gemini-1.5-flash"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r gemotest_pipeline/requirements.txt
+
+      - name: Run pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python -m gemotest_pipeline.pipeline.pipeline \
+            --analysis "${{ inputs.analysis_name }}" \
+            --blocks "${{ inputs.blocks }}" \
+            --model "${{ inputs.model }}"
+
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/gemotest_pipeline/results/
+          git diff --cached --quiet || git commit -m "result: ${{ inputs.analysis_name }}"
+          git push
