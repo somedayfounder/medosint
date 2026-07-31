@@ -6,7 +6,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from .llm import build_prompt, call_gemini, parse_response, estimate_cost
+from .llm import build_prompt, call_gemini, parse_response, estimate_cost, estimate_search_cost
 from .blocks_config import BLOCKS
 from .search import search_and_extract
 from .seo_tz import parse_seo_tz, apply_tz_to_blocks
@@ -85,6 +85,11 @@ def run_block_search_first(analysis: str, block_id: int, model: str, blocks: dic
     total_usage: dict = {}
     total_cost = 0.0
 
+    # Search API costs (Serper + Tavily)
+    search_cost = estimate_search_cost(len(queries), len(sources))
+    total_cost += search_cost
+    print(f"[search-first] Search APIs cost: ${search_cost:.6f}")
+
     # Step 3 — lite model extracts relevant facts from raw HTML
     print(f"[search-first] Извлекаем факты ({EXTRACT_MODEL})…")
     facts_raw, usage_extract = _extract_facts_from_sources(analysis, block, sources)
@@ -101,7 +106,7 @@ def run_block_search_first(analysis: str, block_id: int, model: str, blocks: dic
     total_cost += cost_gen
     for k, v in usage_gen.items():
         total_usage[k] = total_usage.get(k, 0) + v
-    print(f"[search-first] Готово, стоимость: ${cost_gen:.6f}")
+    print(f"[search-first] Готово, стоимость: ${cost_gen:.6f} (Gemini) + ${search_cost:.6f} (Serper+Tavily)")
 
     return {
         "id":             block_id,

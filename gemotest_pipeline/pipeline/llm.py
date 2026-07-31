@@ -151,14 +151,31 @@ def _extract_inline(text: str, field: str, default: str) -> str:
     return m.group(1).strip() if m else default
 
 
-def estimate_cost(usage: dict, model: str = "gemini-1.5-flash") -> float:
-    """Rough USD cost estimate."""
-    # Gemini 1.5 Flash pricing (per 1M tokens, as of 2024)
+def estimate_cost(usage: dict, model: str = "gemini-2.0-flash") -> float:
+    """Rough USD cost estimate based on Gemini pricing (per 1M tokens)."""
     prices = {
-        "gemini-1.5-flash": {"in": 0.075, "out": 0.30},
-        "gemini-1.5-pro":   {"in": 3.50,  "out": 10.50},
+        # Flash models
+        "gemini-2.0-flash":          {"in": 0.10,  "out": 0.40},
+        "gemini-2.0-flash-lite":     {"in": 0.075, "out": 0.30},
+        "gemini-3.5-flash-lite":     {"in": 0.075, "out": 0.30},
+        "gemini-3.6-flash":          {"in": 0.10,  "out": 0.40},
+        # Legacy
+        "gemini-1.5-flash":          {"in": 0.075, "out": 0.30},
+        "gemini-1.5-pro":            {"in": 3.50,  "out": 10.50},
     }
-    p = prices.get(model, prices["gemini-1.5-flash"])
+    # Fallback: assume flash pricing for unknown models
+    p = prices.get(model, {"in": 0.10, "out": 0.40})
     inp = usage.get("prompt_tokens", 0) / 1_000_000 * p["in"]
     out = usage.get("completion_tokens", 0) / 1_000_000 * p["out"]
     return round(inp + out, 6)
+
+
+# Rough API cost per single search-first block run
+# Serper: ~$0.001 per query (paid plan, 3 queries = $0.003)
+# Tavily: ~$0.005 per URL extraction (9 URLs = $0.045)
+SERPER_COST_PER_QUERY = 0.001
+TAVILY_COST_PER_URL   = 0.005
+
+
+def estimate_search_cost(n_queries: int, n_urls: int) -> float:
+    return round(n_queries * SERPER_COST_PER_QUERY + n_urls * TAVILY_COST_PER_URL, 6)

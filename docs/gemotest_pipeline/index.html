@@ -831,7 +831,7 @@ function renderProgress(stats) {
 
   if (s.llm_cost_usd != null) {
     document.getElementById('sCost').textContent = '$' + Number(s.llm_cost_usd).toFixed(4);
-    document.getElementById('sSub').textContent  = 'LLM · ' + (s.sources_used || 0) + ' источников';
+    document.getElementById('sSub').textContent  = 'Gemini+Search · ' + (s.sources_used || 0) + ' источников';
   }
 }
 
