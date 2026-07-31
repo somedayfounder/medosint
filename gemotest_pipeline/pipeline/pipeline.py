@@ -27,21 +27,41 @@ def slugify(s: str) -> str:
 # Blocks that use search-first pipeline instead of raw LLM
 SEARCH_FIRST_BLOCKS = {44}
 
+# Models for search-first pipeline steps
+EXTRACT_MODEL  = "gemini-2.5-flash-lite"   # reads raw Tavily HTML, pulls out facts
+GENERATE_MODEL = "gemini-2.5-flash"         # writes the final block from clean facts
 
-def _generate_block_from_sources(analysis: str, block: dict, sources: list[dict], model: str) -> tuple[str, dict]:
-    """Ask Flash to write a block from web sources."""
-    web_ctx = "\n\n".join(
-        f"Источник: {s['url']}\nЗаголовок: {s['title']}\n\n{s['content']}"
+
+def _extract_facts_from_sources(analysis: str, block: dict, sources: list[dict]) -> tuple[str, dict]:
+    """Lite model: read raw Tavily content, extract only relevant facts for this block."""
+    raw_pages = "\n\n---\n\n".join(
+        f"URL: {s['url']}\nЗаголовок: {s['title']}\n\n{s['content']}"
         for s in sources
     )
+    prompt = (
+        f"Тебе дан сырой текст нескольких веб-страниц об анализе «{analysis}».\n"
+        f"Нужно заполнить блок «{block['name']}».\n"
+        f"Описание блока: {block['description']}\n\n"
+        f"Из текста ниже извлеки ТОЛЬКО факты, релевантные для этого блока.\n"
+        f"Убери навигацию, рекламу, повторы, нерелевантные разделы.\n"
+        f"Верни сжатый список фактов — по одному на строку.\n\n"
+        f"Страницы:\n{raw_pages}"
+    )
+    return call_gemini(prompt, EXTRACT_MODEL)
+
+
+def _generate_block_from_facts(analysis: str, block: dict, facts: str, sources: list[dict], model: str) -> tuple[str, dict]:
+    """Strong model: write the block from extracted facts."""
+    source_list = "\n".join(f"- {s['url']}" for s in sources)
     instructions = block["instructions"].format(analysis=analysis)
     prompt = (
         f"Ты медицинский контент-редактор Гемотест.\n"
         f"Анализ: {analysis}\n"
         f"Блок: {block['name']}\n\n"
         f"Инструкция:\n{instructions}\n\n"
-        f"Данные из веба:\n{web_ctx}\n\n"
-        f"Напиши блок строго по инструкции, используя факты из источников выше."
+        f"Извлечённые факты из веба:\n{facts}\n\n"
+        f"Источники:\n{source_list}\n\n"
+        f"Напиши блок строго по инструкции, опираясь на факты выше."
     )
     return call_gemini(prompt, model)
 
@@ -55,14 +75,30 @@ def run_block_search_first(analysis: str, block_id: int, model: str) -> dict:
     queries = [q.format(analysis=analysis) for q in block.get("search_queries", [])]
     print(f"[search-first] Запросы: {queries}")
 
-    # Step 2 — search + extract
+    # Step 2 — Serper search + Tavily extract
     sources = search_and_extract(queries, max_urls=3)
     print(f"[search-first] Источников: {len(sources)}")
 
-    # Step 3 — generate block from sources
-    print("[search-first] Генерируем блок из источников…")
-    raw, usage = _generate_block_from_sources(analysis, block, sources, model)
-    cost = estimate_cost(usage, model)
+    total_usage: dict = {}
+    total_cost = 0.0
+
+    # Step 3 — lite model extracts relevant facts from raw HTML
+    print(f"[search-first] Извлекаем факты ({EXTRACT_MODEL})…")
+    facts_raw, usage_extract = _extract_facts_from_sources(analysis, block, sources)
+    cost_extract = estimate_cost(usage_extract, EXTRACT_MODEL)
+    total_cost += cost_extract
+    for k, v in usage_extract.items():
+        total_usage[k] = total_usage.get(k, 0) + v
+    print(f"[search-first] Факты: {len(facts_raw)} символов, стоимость: ${cost_extract:.6f}")
+
+    # Step 4 — strong model writes the block from clean facts
+    print(f"[search-first] Генерируем блок ({model})…")
+    block_raw, usage_gen = _generate_block_from_facts(analysis, block, facts_raw, sources, model)
+    cost_gen = estimate_cost(usage_gen, model)
+    total_cost += cost_gen
+    for k, v in usage_gen.items():
+        total_usage[k] = total_usage.get(k, 0) + v
+    print(f"[search-first] Готово, стоимость: ${cost_gen:.6f}")
 
     return {
         "id":           block_id,
@@ -70,7 +106,7 @@ def run_block_search_first(analysis: str, block_id: int, model: str) -> dict:
         "section":      block["section"],
         "pass_group":   block["pass_group"],
         "format":       block["format"],
-        "content":      raw.strip(),
+        "content":      block_raw.strip(),
         "confidence":   "high",
         "needs_verify": False,
         "verified":     True,
@@ -79,8 +115,8 @@ def run_block_search_first(analysis: str, block_id: int, model: str) -> dict:
         "fact_cards":   [],
         "verify_queries": [q.format(analysis=analysis) for q in block.get("verify_queries", [])],
         "_search_queries": queries,
-        "_usage":       usage,
-        "_cost":        cost,
+        "_usage":       total_usage,
+        "_cost":        total_cost,
     }
 
 
@@ -90,8 +126,8 @@ def run(analysis: str, block_ids: list | None, model: str, out_dir: Path):
     print(f"[pipeline] Модель: {model}")
 
     target = set(block_ids) if block_ids else set(BLOCKS.keys())
-    search_ids  = target & SEARCH_FIRST_BLOCKS
-    llm_ids     = target - SEARCH_FIRST_BLOCKS
+    search_ids = target & SEARCH_FIRST_BLOCKS
+    llm_ids    = target - SEARCH_FIRST_BLOCKS
 
     all_blocks: dict[int, dict] = {}
     total_cost = 0.0
@@ -113,7 +149,6 @@ def run(analysis: str, block_ids: list | None, model: str, out_dir: Path):
     llm_id_list = [bid for bid in llm_ids if bid in BLOCKS]
     if llm_id_list:
         print(f"[pipeline] LLM блоки: {llm_id_list}")
-        print("[pipeline] Строим промпт…")
         prompt = build_prompt(analysis, llm_id_list)
         print(f"[pipeline] Промпт: {len(prompt)} символов")
         print("[pipeline] Вызываем Gemini…")
@@ -122,8 +157,7 @@ def run(analysis: str, block_ids: list | None, model: str, out_dir: Path):
         total_cost += cost
         for k, v in usage.items():
             total_usage[k] = total_usage.get(k, 0) + v
-        print(f"[pipeline] Получено {len(raw)} символов, стоимость: ${cost}")
-        print("[pipeline] Парсим ответ…")
+        print(f"[pipeline] Получено {len(raw)} символов, стоимость: ${cost:.6f}")
         parsed = parse_response(raw, analysis, llm_id_list)
         all_blocks.update(parsed)
         print(f"[pipeline] Распознано LLM блоков: {len(parsed)}")
@@ -158,7 +192,7 @@ def main():
     parser = argparse.ArgumentParser(description="Gemotest pipeline")
     parser.add_argument("--analysis", required=True, help="Название анализа")
     parser.add_argument("--blocks", default="", help="ID блоков через запятую (пусто = все)")
-    parser.add_argument("--model", default="gemini-1.5-flash")
+    parser.add_argument("--model", default="gemini-2.0-flash")
     parser.add_argument("--out-dir", default=None, help="Папка для результатов")
     args = parser.parse_args()
 
