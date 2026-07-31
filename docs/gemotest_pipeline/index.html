@@ -514,14 +514,21 @@ function renderProgress(stats) {
 
 // ── Worker API ────────────────────────────────────────────────────────────────
 async function triggerWorkflow(inputs) {
-  const r = await fetch(WORKER_URL() + '/trigger', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(inputs),
-  });
-  if (!r.ok) return false;
-  const d = await r.json();
-  return d.ok === true;
+  try {
+    const r = await fetch(WORKER_URL() + '/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inputs),
+    });
+    const text = await r.text();
+    addLog('info', `Worker: HTTP ${r.status} → ${text.slice(0, 200)}`);
+    if (!r.ok) return false;
+    const d = JSON.parse(text);
+    return d.ok === true;
+  } catch(e) {
+    addLog('error', 'Fetch error: ' + e.message);
+    return false;
+  }
 }
 
 async function findLatestRun() {
