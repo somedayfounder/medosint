@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Gemotest Pipeline Monitor</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #f7f7f8;
+  --surface: #ffffff;
+  --surface2:#f0f0f2;
+  --accent:  #d97757;
+  --accent-d:#c4623d;
+  --accent-l:#fff4ef;
+  --green:   #16a34a;
+  --green-l: #f0fdf4;
+  --red:     #dc2626;
+  --red-l:   #fef2f2;
+  --blue:    #2563eb;
+  --yellow:  #b45309;
+  --text:    #111827;
+  --text2:   #374151;
+  --muted:   #9ca3af;
+  --border:  #e5e7eb;
+  --shadow:  0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.05);
+  --radius:  10px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; font-size:15px; }
+
+.layout { display:grid; grid-template-columns:320px 1fr 360px; height:100vh; overflow:hidden; }
+
+/* ── Left ── */
+.left { background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; }
+.run-form { padding:20px; flex:1; }
+.run-form label { font-size:13px; font-weight:600; color:var(--text2); display:block; margin-bottom:5px; }
+.run-form input, .run-form select {
+  width:100%; border:1.5px solid var(--border); background:var(--bg);
+  color:var(--text); border-radius:8px; padding:8px 11px; font-size:14px;
+  margin-bottom:14px; font-family:var(--font); outline:none; transition:border-color .15s;
+}
+.run-form input:focus, .run-form select:focus { border-color:var(--accent); }
+.btn-run {
+  width:100%; padding:10px; background:var(--accent); color:#fff;
+  border:none; border-radius:8px; font-size:14px; font-weight:600;
+  cursor:pointer; transition:background .15s;
+}
+.btn-run:hover { background:var(--accent-d); }
+.btn-run:disabled { opacity:.45; cursor:not-allowed; }
+.btn-stop {
+  width:100%; margin-top:7px; padding:9px; background:transparent; color:var(--red);
+  border:1.5px solid #fca5a5; border-radius:8px; font-size:14px; font-weight:600;
+  cursor:pointer; display:none;
+}
+.btn-stop:hover { background:var(--red-l); }
+
+.settings-section { padding:16px 20px; border-top:1px solid var(--border); background:var(--surface2); }
+.settings-section label { font-size:12px; font-weight:600; color:var(--muted); display:block; margin-bottom:4px; }
+.settings-section input {
+  width:100%; border:1.5px solid var(--border); background:var(--surface);
+  color:var(--text); border-radius:6px; padding:6px 10px; font-size:13px;
+  margin-bottom:8px; font-family:var(--mono); outline:none;
+}
+.settings-section input:focus { border-color:var(--accent); }
+.btn-save-token {
+  padding:5px 12px; background:var(--accent); color:#fff;
+  border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;
+}
+.token-status { font-size:12px; color:var(--green); margin-top:4px; display:none; }
+
+.badge {
+  font-size:12px; padding:2px 9px; border-radius:999px;
+  font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+}
+.badge-idle    { background:var(--surface2); color:var(--muted); }
+.badge-run     { background:#dbeafe; color:var(--blue); }
+.badge-done    { background:var(--green-l); color:var(--green); }
+.badge-error   { background:var(--red-l); color:var(--red); }
+.badge-queued  { background:#fef9c3; color:#92400e; }
+
+/* ── Center ── */
+.center { display:flex; flex-direction:column; overflow:hidden; }
+.status-bar {
+  display:flex; align-items:center; gap:10px; padding:0 16px; height:42px;
+  background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.tabs {
+  display:flex; border-bottom:1px solid var(--border); background:var(--surface);
+  flex-shrink:0; padding:0 16px;
+}
+.tab {
+  padding:10px 14px; font-size:14px; font-weight:500; color:var(--muted);
+  cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; user-select:none;
+}
+.tab:hover { color:var(--text); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab-badge { display:inline-block; background:var(--accent-l); color:var(--accent); border-radius:999px; font-size:11px; font-weight:700; padding:1px 6px; margin-left:4px; }
+.tab-pane { display:none; flex:1; overflow:hidden; flex-direction:column; }
+.tab-pane.active { display:flex; }
+
+.log-bar {
+  display:flex; align-items:center; gap:8px; padding:8px 16px;
+  border-bottom:1px solid var(--border); background:var(--bg); flex-shrink:0;
+}
+.log-bar span { font-size:13px; color:var(--muted); flex:1; }
+.btn-xs {
+  padding:3px 9px; background:var(--surface); border:1px solid var(--border);
+  color:var(--text2); border-radius:5px; font-size:12px; cursor:pointer; font-family:var(--font);
+}
+.btn-xs:hover { border-color:var(--accent); color:var(--accent); }
+
+#log { flex:1; overflow-y:auto; padding:10px 16px; font-size:13px; line-height:1.7; }
+.ll { display:flex; gap:10px; }
+.ll-ts { color:var(--muted); flex-shrink:0; font-size:12px; padding-top:2px; }
+.ll-body { flex:1; white-space:pre-wrap; word-break:break-all; }
+.t-step  { color:var(--blue); }
+.t-done  { color:var(--green); font-weight:600; }
+.t-error { color:var(--red); font-weight:600; }
+.t-start { color:var(--blue); font-weight:600; }
+.t-info  { color:var(--text2); }
+
+/* ── Blocks pane ── */
+#blocksContent { flex:1; overflow-y:auto; padding:16px; }
+
+.section-hdr {
+  font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); padding:12px 0 8px; border-bottom:2px solid var(--accent);
+  margin-bottom:12px; margin-top:20px;
+}
+.section-hdr:first-child { margin-top:0; }
+
+.block-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow);
+}
+.block-header { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+
+.chip { font-size:12px; padding:2px 8px; border-radius:999px; font-weight:600; }
+.chip-id       { background:var(--bg); color:var(--muted); border:1px solid var(--border); font-family:var(--mono); }
+.chip-high     { background:var(--green-l); color:var(--green); }
+.chip-medium   { background:#fef9c3; color:#92400e; }
+.chip-low      { background:var(--red-l); color:var(--red); }
+.chip-verified { background:var(--green-l); color:var(--green); }
+.chip-warn     { background:#fef3c7; color:#d97706; }
+
+.block-name { font-size:14px; font-weight:700; color:var(--text); flex:1; }
+
+.block-content {
+  font-size:13.5px; line-height:1.65; color:var(--text2);
+  white-space:pre-wrap; word-break:break-word; margin-bottom:6px;
+}
+.block-content table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0; }
+.block-content th, .block-content td { padding:6px 10px; text-align:left; border:1px solid var(--border); }
+.block-content th { background:var(--bg); font-weight:600; font-size:12px; }
+.block-content tr:nth-child(even) td { background:var(--surface2); }
+
+.verify-section { margin-top:10px; border-top:1px solid var(--border); padding-top:10px; }
+.verify-label { font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--green); text-transform:uppercase; margin-bottom:6px; }
+.source-item { font-size:12px; color:var(--text2); margin-bottom:3px; display:flex; gap:6px; }
+.source-item::before { content:'↗'; color:var(--blue); flex-shrink:0; }
+.source-item a { color:var(--blue); text-decoration:none; }
+.source-item a:hover { text-decoration:underline; }
+.fact-card-body { font-size:11px; color:var(--text2); background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-top:6px; white-space:pre-wrap; font-family:var(--mono); }
+.warning-item { font-size:12px; color:#d97706; background:#fef3c7; border-radius:4px; padding:5px 10px; margin-top:6px; }
+
+/* Waiting state */
+.waiting-state {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:100%; gap:12px; color:var(--muted); text-align:center; padding:40px;
+}
+.waiting-state .big { font-size:40px; opacity:.3; }
+.waiting-state p { font-size:14px; line-height:1.6; max-width:340px; }
+
+/* ── Right sidebar ── */
+.right-sidebar { background:var(--surface); border-left:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; }
+.rs-section { padding:16px 18px; border-bottom:1px solid var(--border); }
+.rs-title { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; margin-bottom:12px; }
+
+.cost-hero { background:var(--accent-l); border:1.5px solid #f4c5af; border-radius:10px; padding:14px 16px 12px; }
+.cost-main { font-size:38px; font-weight:800; color:var(--accent); letter-spacing:-.04em; font-variant-numeric:tabular-nums; line-height:1; }
+.cost-sub  { font-size:13px; color:var(--muted); margin-top:5px; }
+
+.prog-row { display:flex; justify-content:space-between; margin-bottom:4px; }
+.prog-label { font-size:13px; color:var(--text2); }
+.prog-val   { font-size:13px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; }
+.prog-bar-wrap { width:100%; height:6px; background:var(--border); border-radius:999px; overflow:hidden; margin-bottom:10px; }
+.prog-bar { height:100%; border-radius:999px; transition:width .4s; background:var(--accent); }
+.prog-bar.green { background:var(--green); }
+
+/* Job status */
+.job-status { display:flex; flex-direction:column; gap:8px; }
+.job-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border); }
+.job-row:last-child { border-bottom:none; }
+.job-dot {
+  width:10px; height:10px; border-radius:50%; flex-shrink:0; background:var(--border);
+}
+.job-dot.queued    { background:var(--yellow); }
+.job-dot.running   { background:var(--blue); animation:pulse 1.5s infinite; }
+.job-dot.success   { background:var(--green); }
+.job-dot.failure   { background:var(--red); }
+.job-label { font-size:13px; color:var(--text2); flex:1; }
+.job-elapsed { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+
+.run-link { font-size:12px; color:var(--blue); text-decoration:none; display:block; margin-top:8px; }
+.run-link:hover { text-decoration:underline; }
+
+/* Recent runs list */
+.recent-item {
+  display:flex; align-items:center; gap:8px; padding:5px 0;
+  font-size:13px; cursor:pointer; border-radius:5px;
+}
+.recent-item:hover .recent-name { color:var(--accent); }
+.recent-name { color:var(--text2); flex:1; }
+.recent-date { font-size:11px; color:var(--muted); }
+.recent-dot  { width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+@keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+.shimmer {
+  background:linear-gradient(90deg,var(--muted) 25%,var(--text2) 50%,var(--muted) 75%);
+  background-size:200% auto; -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text; animation:shimmer 1.8s linear infinite; display:inline-block;
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── LEFT: form ── -->
+  <div class="left">
+    <div class="run-form">
+      <div style="font-size:16px;font-weight:700;letter-spacing:-.02em;margin-bottom:20px;display:flex;align-items:center;gap:10px">
+        Gemotest <span style="color:var(--accent)">Pipeline</span>
+        <span class="badge badge-idle" id="statusBadge">Idle</span>
+      </div>
+
+      <label>Анализ</label>
+      <input id="analysisInput" type="text" placeholder="напр. ТТГ" />
+
+      <label>Комплекс (опционально)</label>
+      <input id="complexInput" type="text" placeholder="Т4св, АТ-ТПО" />
+
+      <label>Блоки (пусто = все)</label>
+      <input id="blocksInput" type="text" placeholder="1, 3, 44" />
+
+      <label>Модель</label>
+      <select id="modelSelect">
+        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+      </select>
+
+      <button class="btn-run" id="runBtn" onclick="startRun()">▶  Запустить</button>
+      <button class="btn-stop" id="stopBtn" onclick="stopRun()" style="display:none">■  Отмена</button>
+
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px">Последние</div>
+        <div id="recentList"></div>
+      </div>
+    </div>
+
+    <!-- Settings: token + repo -->
+    <div class="settings-section">
+      <label>GitHub Token (PAT)</label>
+      <input id="tokenInput" type="password" placeholder="ghp_xxxxxxxxxxxx" />
+      <label>Репозиторий</label>
+      <input id="repoInput" type="text" placeholder="owner/repo-name" value="somedayfounder/gemotest_pipeline" />
+      <button class="btn-save-token" onclick="saveSettings()">Сохранить</button>
+      <div class="token-status" id="tokenStatus">✓ Сохранено в localStorage</div>
+    </div>
+  </div>
+
+  <!-- ── CENTER ── -->
+  <div class="center">
+    <div class="status-bar">
+      <span id="runStatus" style="font-size:13px;color:var(--muted)">Ожидание…</span>
+    </div>
+    <div class="tabs">
+      <div class="tab active" id="tabBlocks" onclick="switchTab('blocks')">Блоки <span class="tab-badge" id="blocksBadge">0</span></div>
+      <div class="tab" id="tabLog" onclick="switchTab('log')">Log <span class="tab-badge" id="logBadge">0</span></div>
+    </div>
+
+    <!-- Блоки -->
+    <div class="tab-pane active" id="blocksPane">
+      <div id="blocksContent">
+        <div class="waiting-state" id="waitingState">
+          <div class="big">🧪</div>
+          <p>Введите название анализа и нажмите <strong>Запустить</strong>.<br>Блоки появятся здесь когда GitHub Actions завершит работу (~2–3 мин).</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="tab-pane" id="logPane">
+      <div class="log-bar">
+        <span id="logInfo">0 событий</span>
+        <button class="btn-xs" onclick="copyLog()">Copy</button>
+        <button class="btn-xs" onclick="clearLog()">Clear</button>
+        <button class="btn-xs" id="asBtn" onclick="toggleAS()">↓ Auto</button>
+      </div>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT sidebar ── -->
+  <div class="right-sidebar">
+
+    <div class="rs-section">
+      <div class="rs-title">Стоимость</div>
+      <div class="cost-hero">
+        <div class="cost-main" id="sCost">—</div>
+        <div class="cost-sub" id="sSub">Последний запуск</div>
+      </div>
+    </div>
+
+    <div class="rs-section">
+      <div class="rs-title">Прогресс</div>
+      <div class="prog-row">
+        <span class="prog-label">Заполнено</span>
+        <span class="prog-val" id="bpFilled">— / —</span>
+      </div>
+      <div class="prog-bar-wrap"><div class="prog-bar" id="bpFilledBar" style="width:0%"></div></div>
+      <div class="prog-row">
+        <span class="prog-label">Верифицировано</span>
+        <span class="prog-val" id="bpVerified">— / —</span>
+      </div>
+      <div class="prog-bar-wrap"><div class="prog-bar green" id="bpVerifiedBar" style="width:0%"></div></div>
+    </div>
+
+    <div class="rs-section">
+      <div class="rs-title">Actions Job</div>
+      <div id="jobStatus" class="job-status">
+        <div style="font-size:13px;color:var(--muted)">Нет активного запуска</div>
+      </div>
+      <a id="runLink" class="run-link" href="#" target="_blank" style="display:none">Открыть в GitHub Actions ↗</a>
+    </div>
+
+    <div class="rs-section" style="flex:1">
+      <div class="rs-title">История</div>
+      <div id="historyList" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const WORKFLOW_FILE = 'run.yml';
+const SECTIONS = [
+  { key: 'b2c', label: 'B2C — Для пациента' },
+  { key: 'b2b', label: 'B2B — Для врача' },
+  { key: 'geo', label: 'GEO / SEO' },
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let logCount = 0, autoScroll = true;
+let currentAnalysis = '';
+let pollTimer = null;
+let currentRunId = null;
+let startedAt = null;
+let sectionEls = {};
+let blocksFilled = 0, blocksTotal = 0, blocksVerified = 0;
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function getToken() { return localStorage.getItem('gh_token') || ''; }
+function getRepo()  { return localStorage.getItem('gh_repo') || 'somedayfounder/gemotest_pipeline'; }
+
+function saveSettings() {
+  const token = document.getElementById('tokenInput').value.trim();
+  const repo  = document.getElementById('repoInput').value.trim();
+  if (token) localStorage.setItem('gh_token', token);
+  if (repo)  localStorage.setItem('gh_repo', repo);
+  const st = document.getElementById('tokenStatus');
+  st.style.display = 'block';
+  setTimeout(() => st.style.display = 'none', 2000);
+}
+
+function loadSettings() {
+  const repo = getRepo();
+  if (repo) document.getElementById('repoInput').value = repo;
+}
+
+// ── Slugify (matches pipeline.py) ─────────────────────────────────────────────
+const CYR = {а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'yo',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'};
+function slugify(s) {
+  return s.toLowerCase()
+    .split('').map(c => CYR[c] !== undefined ? CYR[c] : c).join('')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['blocks', 'log'].forEach(t => {
+    document.getElementById('tab' + t[0].toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
+    document.getElementById(t + 'Pane').classList.toggle('active', t === tab);
+  });
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+function setStatus(cls, label) {
+  const b = document.getElementById('statusBadge');
+  b.className = 'badge badge-' + cls;
+  b.textContent = label;
+}
+
+function setRunning(on) {
+  document.getElementById('runBtn').style.display  = on ? 'none'  : 'block';
+  document.getElementById('stopBtn').style.display = on ? 'block' : 'none';
+}
+
+// ── Sections ──────────────────────────────────────────────────────────────────
+function initSections() {
+  sectionEls = {};
+  blocksFilled = 0; blocksVerified = 0; blocksTotal = 0;
+  const bc = document.getElementById('blocksContent');
+  bc.innerHTML = '';
+  SECTIONS.forEach(s => {
+    const hdr = document.createElement('div');
+    hdr.className = 'section-hdr';
+    hdr.textContent = s.label;
+    bc.appendChild(hdr);
+    const wrap = document.createElement('div');
+    wrap.id = 'sec-' + s.key;
+    bc.appendChild(wrap);
+    sectionEls[s.key] = wrap;
+  });
+}
+
+// ── Markdown table renderer ───────────────────────────────────────────────────
+function renderContent(text) {
+  if (!text) return '';
+  const lines = text.split('\n');
+  const out = []; let tl = [], inT = false;
+  for (const line of lines) {
+    const tr = line.trim();
+    if (tr.startsWith('|') && tr.endsWith('|')) {
+      if (!inT) { inT = true; tl = []; }
+      tl.push(line);
+    } else {
+      if (inT) { out.push(renderTable(tl)); tl = []; inT = false; }
+      out.push(esc(line));
+    }
+  }
+  if (inT) out.push(renderTable(tl));
+  return out.join('\n');
+}
+
+function renderTable(lines) {
+  if (!lines.length) return '';
+  const heads = lines[0].split('|').slice(1,-1).map(s => s.trim());
+  const rows  = lines.slice(2).map(l => l.split('|').slice(1,-1).map(s => s.trim()));
+  let h = '<div style="overflow-x:auto;margin:6px 0"><table>';
+  h += '<tr>' + heads.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>';
+  rows.forEach(r => { h += '<tr>' + r.map(c => `<td>${esc(c)}</td>`).join('') + '</tr>'; });
+  return h + '</table></div>';
+}
+
+// ── Block rendering from JSON ─────────────────────────────────────────────────
+function renderResult(data) {
+  initSections();
+  const blocks = data.blocks || {};
+  const order = Object.values(blocks).sort((a, b) => a.id - b.id);
+  blocksTotal = order.length;
+
+  order.forEach(b => {
+    const section = sectionEls[b.section] || sectionEls['b2c'];
+    blocksFilled++;
+
+    const confClass = { high: 'chip-high', medium: 'chip-medium', low: 'chip-low' }[b.confidence] || 'chip-medium';
+    const confLabel = { high: 'High', medium: 'Medium', low: 'Low' }[b.confidence] || (b.confidence || '?');
+    const vChip = b.verified
+      ? `<span class="chip chip-verified">✓ ${(b.sources||[]).length} источников</span>`
+      : `<span class="chip chip-warn">⚠ не верифицировано</span>`;
+    if (b.verified) blocksVerified++;
+
+    const sourcesHtml = b.verified && b.sources && b.sources.length
+      ? `<div class="verify-section">
+           <div class="verify-label">● Верифицировано · ${b.sources.length} источников</div>
+           ${b.sources.map(s => `<div class="source-item"><a href="${esc(s)}" target="_blank">${esc(s.length > 90 ? s.slice(0,90)+'…' : s)}</a></div>`).join('')}
+         </div>`
+      : '';
+
+    const warningsHtml = (b.warnings || []).map(w => `<div class="warning-item">${esc(w)}</div>`).join('');
+
+    const factCardsHtml = b.fact_cards && b.fact_cards.length
+      ? `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:600;list-style:none">Факт-карточки (${b.fact_cards.length})</summary>
+           ${b.fact_cards.map(fc => `<div class="fact-card-body">${esc(fc.card || String(fc))}</div>`).join('')}
+         </details>`
+      : '';
+
+    const card = document.createElement('div');
+    card.className = 'block-card';
+    card.innerHTML = `
+      <div class="block-header">
+        <span class="chip chip-id">${b.id}</span>
+        <span class="block-name">${esc(b.name)}</span>
+        <span class="chip ${confClass}">${confLabel}</span>
+        ${vChip}
+      </div>
+      <div class="block-content">${renderContent(b.content || '')}</div>
+      ${sourcesHtml}${warningsHtml}${factCardsHtml}
+    `;
+    section.appendChild(card);
+  });
+
+  document.getElementById('blocksBadge').textContent = blocksFilled;
+  renderProgress(data.stats);
+}
+
+function renderProgress(stats) {
+  const s = stats || {};
+  const filled   = s.blocks_filled   || blocksFilled;
+  const verified = s.blocks_verified || blocksVerified;
+  const total    = s.blocks_total    || blocksTotal || filled;
+
+  document.getElementById('bpFilled').textContent   = filled + ' / ' + total;
+  document.getElementById('bpVerified').textContent = verified + ' / ' + filled;
+  const fp = total  ? (filled   / total  * 100).toFixed(1) : 0;
+  const vp = filled ? (verified / filled * 100).toFixed(1) : 0;
+  document.getElementById('bpFilledBar').style.width   = fp + '%';
+  document.getElementById('bpVerifiedBar').style.width = vp + '%';
+
+  if (s.llm_cost_usd != null) {
+    document.getElementById('sCost').textContent = '$' + Number(s.llm_cost_usd).toFixed(4);
+    document.getElementById('sSub').textContent  = 'LLM · ' + (s.sources_used || 0) + ' источников';
+  }
+}
+
+// ── GitHub API ────────────────────────────────────────────────────────────────
+function ghHeaders() {
+  return {
+    'Authorization': 'token ' + getToken(),
+    'Accept': 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json',
+  };
+}
+
+async function triggerWorkflow(inputs) {
+  const [owner, repo] = getRepo().split('/');
+  const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: ghHeaders(),
+    body: JSON.stringify({ ref: 'main', inputs }),
+  });
+  return r.status === 204;
+}
+
+async function findLatestRun() {
+  const [owner, repo] = getRepo().split('/');
+  const url = `https://api.github.com/repos/${owner}/${repo}/actions/runs?event=workflow_dispatch&per_page=5`;
+  const r = await fetch(url, { headers: ghHeaders() });
+  if (!r.ok) return null;
+  const d = await r.json();
+  // Find the run created after we triggered
+  const runs = (d.workflow_runs || []).filter(run => new Date(run.created_at) >= startedAt);
+  return runs[0] || null;
+}
+
+async function getRunStatus(runId) {
+  const [owner, repo] = getRepo().split('/');
+  const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}`, { headers: ghHeaders() });
+  if (!r.ok) return null;
+  return r.json();
+}
+
+// ── Job status rendering ──────────────────────────────────────────────────────
+function renderJobStatus(run) {
+  if (!run) return;
+
+  const status = run.status;      // queued | in_progress | completed
+  const conclusion = run.conclusion; // success | failure | cancelled | null
+
+  const dotClass = status === 'completed'
+    ? (conclusion === 'success' ? 'success' : 'failure')
+    : status === 'in_progress' ? 'running' : 'queued';
+
+  const label = status === 'completed'
+    ? (conclusion === 'success' ? '✓ Завершено успешно' : '✗ Завершено с ошибкой')
+    : status === 'in_progress' ? 'Выполняется…' : 'В очереди…';
+
+  const elapsed = run.updated_at
+    ? Math.round((new Date(run.updated_at) - new Date(run.created_at)) / 1000) + ' сек'
+    : '';
+
+  document.getElementById('jobStatus').innerHTML = `
+    <div class="job-row">
+      <div class="job-dot ${dotClass}"></div>
+      <span class="job-label">${label}</span>
+      <span class="job-elapsed">${elapsed}</span>
+    </div>
+  `;
+
+  const link = document.getElementById('runLink');
+  link.href = run.html_url;
+  link.style.display = 'block';
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+async function poll() {
+  try {
+    // First find the run ID if we don't have it yet
+    if (!currentRunId) {
+      const run = await findLatestRun();
+      if (run) {
+        currentRunId = run.id;
+        addLog('step', `Job #${run.id} найден`);
+        renderJobStatus(run);
+      } else {
+        addLog('info', 'Ожидаем запуска job…');
+        pollTimer = setTimeout(poll, 4000);
+        return;
+      }
+    }
+
+    const run = await getRunStatus(currentRunId);
+    if (!run) { pollTimer = setTimeout(poll, 5000); return; }
+
+    renderJobStatus(run);
+
+    if (run.status === 'in_progress') {
+      document.getElementById('runStatus').textContent = `⏳ ${currentAnalysis} · выполняется…`;
+      setStatus('run', 'Running');
+      addLog('step', 'Actions: in_progress');
+      pollTimer = setTimeout(poll, 5000);
+      return;
+    }
+
+    if (run.status === 'queued') {
+      addLog('step', 'Actions: queued');
+      pollTimer = setTimeout(poll, 4000);
+      return;
+    }
+
+    if (run.status === 'completed') {
+      setRunning(false);
+      if (run.conclusion === 'success') {
+        setStatus('done', 'Done');
+        addLog('done', `✓ Job завершён · загружаем результат…`);
+        document.getElementById('runStatus').textContent = `✓ ${currentAnalysis} · загружаем блоки…`;
+        await loadResult(currentAnalysis);
+        addToHistory(currentAnalysis, run);
+      } else {
+        setStatus('error', 'Error');
+        addLog('error', `✗ Job завершён с ошибкой: ${run.conclusion}`);
+        document.getElementById('runStatus').textContent = `✗ ${currentAnalysis} · ошибка`;
+      }
+    }
+  } catch(e) {
+    addLog('error', 'Ошибка поллинга: ' + e.message);
+    pollTimer = setTimeout(poll, 8000);
+  }
+}
+
+async function loadResult(analysis) {
+  const slug = slugify(analysis);
+  const url = `results/${slug}.json`;
+  try {
+    const r = await fetch(url + '?t=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    renderResult(data);
+    document.getElementById('runStatus').textContent = `✓ ${analysis} · ${Object.keys(data.blocks || {}).length} блоков`;
+    addLog('done', `Загружено: ${url}`);
+  } catch(e) {
+    addLog('error', `Не удалось загрузить ${url}: ${e.message}`);
+  }
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+function addToHistory(analysis, run) {
+  const saved = JSON.parse(localStorage.getItem('gh_history') || '[]');
+  saved.unshift({ analysis, runId: run.id, url: run.html_url, ts: new Date().toISOString() });
+  if (saved.length > 10) saved.pop();
+  localStorage.setItem('gh_history', JSON.stringify(saved));
+  renderHistory();
+}
+
+function renderHistory() {
+  const saved = JSON.parse(localStorage.getItem('gh_history') || '[]');
+  const el = document.getElementById('historyList');
+  if (!saved.length) { el.innerHTML = '<div style="font-size:13px;color:var(--muted)">—</div>'; return; }
+  el.innerHTML = saved.slice(0, 6).map(h => {
+    const slug = slugify(h.analysis);
+    const date = new Date(h.ts).toLocaleString('ru', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    return `<div class="recent-item" onclick="openResult('${esc(h.analysis)}')">
+      <div class="recent-dot"></div>
+      <span class="recent-name">${esc(h.analysis)}</span>
+      <span class="recent-date">${date}</span>
+    </div>`;
+  }).join('');
+}
+
+async function openResult(analysis) {
+  document.getElementById('analysisInput').value = analysis;
+  currentAnalysis = analysis;
+  initSections();
+  await loadResult(analysis);
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+async function startRun() {
+  const analysis = document.getElementById('analysisInput').value.trim();
+  if (!analysis) { alert('Введите название анализа'); return; }
+  if (!getToken()) { alert('Добавьте GitHub Token в настройках внизу'); return; }
+
+  currentAnalysis = analysis;
+  currentRunId    = null;
+  startedAt       = new Date();
+  if (pollTimer) clearTimeout(pollTimer);
+
+  initSections();
+  document.getElementById('runStatus').textContent = `▶ Запускаем: ${analysis}…`;
+  document.getElementById('runLink').style.display = 'none';
+  document.getElementById('jobStatus').innerHTML = '<div style="font-size:13px;color:var(--muted)"><span class="shimmer">Запускаем workflow…</span></div>';
+  setStatus('run', 'Running');
+  setRunning(true);
+  addLog('start', `▶ ${analysis}` + (document.getElementById('complexInput').value ? ' + ' + document.getElementById('complexInput').value : ''));
+
+  const ok = await triggerWorkflow({
+    analysis_name:  analysis,
+    complex_names:  document.getElementById('complexInput').value.trim(),
+    blocks:         document.getElementById('blocksInput').value.trim(),
+    model:          document.getElementById('modelSelect').value,
+  });
+
+  if (!ok) {
+    setStatus('error', 'Error');
+    setRunning(false);
+    addLog('error', 'Не удалось запустить workflow. Проверьте токен и имя репозитория.');
+    document.getElementById('runStatus').textContent = '✗ Ошибка запуска';
+    return;
+  }
+
+  addLog('step', 'workflow_dispatch отправлен · ищем job…');
+  pollTimer = setTimeout(poll, 3000);
+}
+
+function stopRun() {
+  if (pollTimer) clearTimeout(pollTimer);
+  setRunning(false);
+  setStatus('idle', 'Idle');
+  addLog('info', '■ Поллинг остановлен (job продолжает выполняться в Actions)');
+  document.getElementById('runStatus').textContent = 'Ожидание…';
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+function addLog(type, msg) {
+  const el = document.getElementById('log');
+  const ts = new Date().toTimeString().slice(0, 8);
+  const d = document.createElement('div');
+  d.className = 'll';
+  d.innerHTML = `<span class="ll-ts">${ts}</span><span class="ll-body t-${type}">${esc(msg)}</span>`;
+  el.appendChild(d);
+  logCount++;
+  document.getElementById('logInfo').textContent = logCount + ' событий';
+  document.getElementById('logBadge').textContent = logCount;
+  if (autoScroll) el.scrollTop = el.scrollHeight;
+}
+function clearLog()  { document.getElementById('log').innerHTML = ''; logCount = 0; document.getElementById('logInfo').textContent = '0 событий'; document.getElementById('logBadge').textContent = 0; }
+function toggleAS()  { autoScroll = !autoScroll; document.getElementById('asBtn').textContent = autoScroll ? '↓ Auto' : '  Manual'; }
+function copyLog()   { const lines = []; document.querySelectorAll('#log .ll').forEach(el => lines.push(el.textContent.trim())); navigator.clipboard.writeText(lines.join('\n')); }
+function esc(s)      { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadSettings();
+renderHistory();
+</script>
+</body>
+</html>
