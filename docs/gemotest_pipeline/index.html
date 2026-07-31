@@ -932,16 +932,24 @@ async function triggerWorkflow(inputs) {
 }
 
 async function findLatestRun() {
-  const r = await fetch(WORKER_URL() + '/runs?since=' + encodeURIComponent(startedAt.toISOString()));
-  if (!r.ok) return null;
-  const d = await r.json();
-  return d.run || null;
+  try {
+    const r = await fetch(WORKER_URL() + '/runs?since=' + encodeURIComponent(startedAt.toISOString()));
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.run || null;
+  } catch(e) {
+    return null;
+  }
 }
 
 async function getRunStatus(runId) {
-  const r = await fetch(WORKER_URL() + '/status?runId=' + runId);
-  if (!r.ok) return null;
-  return r.json();
+  try {
+    const r = await fetch(WORKER_URL() + '/status?runId=' + runId);
+    if (!r.ok) return null;
+    return r.json();
+  } catch(e) {
+    return null;
+  }
 }
 
 // ── Job status rendering ──────────────────────────────────────────────────────
