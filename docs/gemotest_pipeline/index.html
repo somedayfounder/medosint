@@ -260,6 +260,24 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
       <label>Анализ</label>
       <input id="analysisInput" type="text" placeholder="напр. ТТГ" />
 
+      <!-- SEO TZ upload -->
+      <div style="margin-top:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);flex:1">SEO ТЗ</span>
+          <input id="seoTzFile" type="file" accept=".md,.txt" style="display:none" onchange="loadSeoTzFile(this)">
+          <button class="btn-xs" onclick="document.getElementById('seoTzFile').click()">Загрузить файл</button>
+          <button class="btn-xs" onclick="toggleSeoTzArea()">Вставить текст</button>
+          <button class="btn-xs" id="seoTzClearBtn" onclick="clearSeoTz()" style="display:none;color:var(--red,#e53)">✕</button>
+        </div>
+        <textarea id="seoTzArea" placeholder="Вставьте текст SEO ТЗ в формате markdown…"
+          oninput="onSeoTzInput()"
+          style="display:none;width:100%;box-sizing:border-box;height:80px;resize:vertical;
+                 font-size:11px;font-family:var(--mono);padding:6px 8px;
+                 background:var(--bg2);border:1px solid var(--border);border-radius:4px;
+                 color:var(--text1);line-height:1.4"></textarea>
+        <div id="seoTzStatus" style="display:none;font-size:11px;color:var(--muted);margin-top:3px"></div>
+      </div>
+
       <button class="btn-run" id="runBtn" onclick="startRun()">▶  Запустить</button>
       <button class="btn-stop" id="stopBtn" onclick="stopRun()" style="display:none">■  Отмена</button>
     </div>
@@ -569,6 +587,56 @@ let pollTimer = null;
 let currentRunId = null;
 let lastLoggedStatus = null;
 let startedAt = null;
+let seoTzContent = '';
+
+// ── SEO TZ helpers ─────────────────────────────────────────────────────────────
+function loadSeoTzFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    seoTzContent = e.target.result;
+    document.getElementById('seoTzArea').value = seoTzContent;
+    document.getElementById('seoTzArea').style.display = 'block';
+    showSeoTzStatus();
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function toggleSeoTzArea() {
+  const area = document.getElementById('seoTzArea');
+  area.style.display = area.style.display === 'none' ? 'block' : 'none';
+}
+
+function onSeoTzInput() {
+  seoTzContent = document.getElementById('seoTzArea').value;
+  showSeoTzStatus();
+}
+
+function clearSeoTz() {
+  seoTzContent = '';
+  document.getElementById('seoTzArea').value = '';
+  document.getElementById('seoTzArea').style.display = 'none';
+  document.getElementById('seoTzStatus').style.display = 'none';
+  document.getElementById('seoTzClearBtn').style.display = 'none';
+}
+
+function showSeoTzStatus() {
+  const statusEl = document.getElementById('seoTzStatus');
+  const clearBtn = document.getElementById('seoTzClearBtn');
+  if (!seoTzContent.trim()) {
+    statusEl.style.display = 'none';
+    clearBtn.style.display = 'none';
+    return;
+  }
+  // Count H2 sections and estimate coverage
+  const h2Count = (seoTzContent.match(/^H2:/gim) || []).length;
+  const kwMatch = seoTzContent.match(/\*\s+[^\n]+/g) || [];
+  const chars = seoTzContent.length;
+  statusEl.textContent = `✓ ТЗ загружено · ${chars} символов · ${h2Count} разделов · ~${kwMatch.length} ключевых фраз`;
+  statusEl.style.display = 'block';
+  clearBtn.style.display = 'inline-block';
+}
 let sectionEls = {};
 let blocksFilled = 0, blocksTotal = 0, blocksVerified = 0;
 
@@ -896,15 +964,25 @@ async function poll() {
 async function loadResult(analysis) {
   const slug = slugify(analysis);
   const url = `results/${slug}.json`;
-  try {
-    const r = await fetch(url + '?t=' + Date.now());
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    renderResult(data);
-    document.getElementById('runStatus').textContent = `✓ ${analysis} · ${Object.keys(data.blocks || {}).length} блоков`;
-    addLog('done', `Загружено: ${url}`);
-  } catch(e) {
-    addLog('error', `Не удалось загрузить ${url}: ${e.message}`);
+  // GitHub Pages can take 1-3 min to rebuild after commit — retry with backoff
+  const delays = [3000, 6000, 12000, 20000, 30000];
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      const r = await fetch(url + '?t=' + Date.now());
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      renderResult(data);
+      document.getElementById('runStatus').textContent = `✓ ${analysis} · ${Object.keys(data.blocks || {}).length} блоков`;
+      addLog('done', `Загружено: ${url}`);
+      return;
+    } catch(e) {
+      if (i < delays.length) {
+        addLog('info', `Файл ещё не готов (GitHub Pages перестраивается) · повтор через ${delays[i]/1000}с…`);
+        await new Promise(r => setTimeout(r, delays[i]));
+      } else {
+        addLog('error', `Не удалось загрузить ${url}: ${e.message}`);
+      }
+    }
   }
 }
 
@@ -956,12 +1034,17 @@ async function startRun() {
   document.getElementById('jobStatus').innerHTML = '<div style="font-size:13px;color:var(--muted)"><span class="shimmer">Запускаем workflow…</span></div>';
   setStatus('run', 'Running');
   setRunning(true);
-  addLog('start', `▶ ${analysis}`);
+  addLog('start', `▶ ${analysis}${seoTzContent ? ' · SEO ТЗ загружено' : ''}`);
 
-  const ok = await triggerWorkflow({
+  const inputs = {
     analysis_name: analysis,
     blocks:        getSelectedBlocks(),
-  });
+  };
+  if (seoTzContent.trim()) {
+    inputs.seo_tz = seoTzContent;
+    addLog('step', `SEO ТЗ: ${seoTzContent.length} символов передано в пайплайн`);
+  }
+  const ok = await triggerWorkflow(inputs);
 
   if (!ok) {
     setStatus('error', 'Error');

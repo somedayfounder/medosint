@@ -16,14 +16,15 @@ def _configure():
     genai.configure(api_key=api_key)
 
 
-def build_prompt(analysis: str, block_ids: list | None = None) -> str:
+def build_prompt(analysis: str, block_ids: list | None = None, blocks: dict | None = None) -> str:
     """Build the multi-pass prompt for all requested blocks."""
+    blocks = blocks or BLOCKS
     target = set(block_ids) if block_ids else None
 
     passes = []
     for i, (pass_id, pass_label) in enumerate(PASS_GROUPS):
         pass_blocks = sorted(
-            [b for b in BLOCKS.values()
+            [b for b in blocks.values()
              if b["pass_group"] == pass_id and (target is None or b["id"] in target)],
             key=lambda b: b["id"],
         )

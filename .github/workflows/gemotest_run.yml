@@ -10,6 +10,10 @@ on:
         description: "ID блоков через запятую (пусто = все)"
         required: false
         default: ""
+      seo_tz:
+        description: "SEO ТЗ в формате markdown (опционально)"
+        required: false
+        default: ""
 
 jobs:
   run:
@@ -32,6 +36,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI }}
           SERPER_API_KEY: ${{ secrets.SERPER }}
           TAVILY_API_KEY: ${{ secrets.TAVILY }}
+          SEO_TZ_CONTENT: ${{ inputs.seo_tz }}
         run: |
           python -m gemotest_pipeline.pipeline.pipeline \
             --analysis "${{ inputs.analysis_name }}" \

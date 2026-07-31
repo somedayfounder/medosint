@@ -9,6 +9,7 @@ from pathlib import Path
 from .llm import build_prompt, call_gemini, parse_response, estimate_cost
 from .blocks_config import BLOCKS
 from .search import search_and_extract
+from .seo_tz import parse_seo_tz, apply_tz_to_blocks
 
 
 def slugify(s: str) -> str:
@@ -67,9 +68,10 @@ def _generate_block_from_facts(analysis: str, block: dict, facts: str, sources: 
     return call_gemini(prompt, model)
 
 
-def run_block_search_first(analysis: str, block_id: int, model: str) -> dict:
+def run_block_search_first(analysis: str, block_id: int, model: str, blocks: dict | None = None) -> dict:
     """Full search-first pipeline for a single block."""
-    block = BLOCKS[block_id]
+    blocks = blocks or BLOCKS
+    block = blocks[block_id]
     print(f"[search-first] Блок {block_id}: {block['name']}")
 
     # Step 1 — queries from block config
@@ -126,12 +128,14 @@ def run_block_search_first(analysis: str, block_id: int, model: str) -> dict:
     }
 
 
-def run(analysis: str, block_ids: list | None, model: str, out_dir: Path):
+def run(analysis: str, block_ids: list | None, model: str, out_dir: Path, blocks: dict | None = None):
+    blocks = blocks or BLOCKS
     print(f"[pipeline] Анализ: {analysis}")
     print(f"[pipeline] Блоки: {block_ids or 'все'}")
     print(f"[pipeline] Модель: {model}")
+    print(f"[pipeline] SEO ТЗ: {'да' if blocks is not BLOCKS else 'нет'}")
 
-    target = set(block_ids) if block_ids else set(BLOCKS.keys())
+    target = set(block_ids) if block_ids else set(blocks.keys())
     search_ids = target & SEARCH_FIRST_BLOCKS
     llm_ids    = target - SEARCH_FIRST_BLOCKS
 
@@ -141,10 +145,10 @@ def run(analysis: str, block_ids: list | None, model: str, out_dir: Path):
 
     # ── Search-first blocks ───────────────────────────────────────────────────
     for bid in search_ids:
-        if bid not in BLOCKS:
+        if bid not in blocks:
             print(f"[pipeline] Блок {bid} не найден в реестре, пропускаем")
             continue
-        result = run_block_search_first(analysis, bid, model)
+        result = run_block_search_first(analysis, bid, model, blocks)
         total_cost += result.pop("_cost", 0)
         u = result.pop("_usage", {})
         for k, v in u.items():
@@ -152,10 +156,10 @@ def run(analysis: str, block_ids: list | None, model: str, out_dir: Path):
         all_blocks[bid] = result
 
     # ── LLM-only blocks ───────────────────────────────────────────────────────
-    llm_id_list = [bid for bid in llm_ids if bid in BLOCKS]
+    llm_id_list = [bid for bid in llm_ids if bid in blocks]
     if llm_id_list:
         print(f"[pipeline] LLM блоки: {llm_id_list}")
-        prompt = build_prompt(analysis, llm_id_list)
+        prompt = build_prompt(analysis, llm_id_list, blocks)
         print(f"[pipeline] Промпт: {len(prompt)} символов")
         print("[pipeline] Вызываем Gemini…")
         raw, usage = call_gemini(prompt, model)
@@ -220,7 +224,16 @@ def main():
     repo_root = Path(__file__).parent.parent.parent
     out_dir = Path(args.out_dir) if args.out_dir else repo_root / "docs" / "gemotest_pipeline" / "results"
 
-    run(args.analysis, block_ids, args.model, out_dir)
+    # Load SEO TZ from env if provided
+    blocks = None
+    seo_tz_content = os.environ.get("SEO_TZ_CONTENT", "").strip()
+    if seo_tz_content:
+        tz = parse_seo_tz(seo_tz_content)
+        blocks = apply_tz_to_blocks(BLOCKS, tz)
+        print(f"[pipeline] SEO ТЗ загружено: {len(tz['block_overrides'])} блоков дополнено, "
+              f"{len(tz['keywords'])} ключевых слов, {len(tz['lsi_terms'])} LSI-терминов")
+
+    run(args.analysis, block_ids, args.model, out_dir, blocks)
 
 
 if __name__ == "__main__":
