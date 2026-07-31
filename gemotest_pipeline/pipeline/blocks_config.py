@@ -74,8 +74,8 @@ BLOCKS = {
         ),
         "format": "prose",
         "search_queries": [
-            "{analysis} что показывает анализ описание",
-            "{analysis} анализ крови для чего назначают",
+            "{analysis} клиническое значение анализ для чего назначают показания",
+            "{analysis} анализ описание инвитро OR хеликс OR кдл",
         ],
         "verify_queries": [],
         "priority": "high",
