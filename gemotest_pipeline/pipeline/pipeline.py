@@ -27,9 +27,9 @@ def slugify(s: str) -> str:
 # Blocks that use search-first pipeline instead of raw LLM
 SEARCH_FIRST_BLOCKS = {44}
 
-# Models for search-first pipeline steps
+# Models for search-first pipeline steps (fixed, independent of UI model selection)
 EXTRACT_MODEL  = "gemini-2.5-flash-lite"   # reads raw Tavily HTML, pulls out facts
-GENERATE_MODEL = "gemini-2.5-flash"         # writes the final block from clean facts
+GENERATE_MODEL = "gemini-3.6-flash"         # writes the final block from clean facts
 
 
 def _extract_facts_from_sources(analysis: str, block: dict, sources: list[dict]) -> tuple[str, dict]:
@@ -92,8 +92,8 @@ def run_block_search_first(analysis: str, block_id: int, model: str) -> dict:
     print(f"[search-first] Факты: {len(facts_raw)} символов, стоимость: ${cost_extract:.6f}")
 
     # Step 4 — strong model writes the block from clean facts
-    print(f"[search-first] Генерируем блок ({model})…")
-    block_raw, usage_gen = _generate_block_from_facts(analysis, block, facts_raw, sources, model)
+    print(f"[search-first] Генерируем блок ({GENERATE_MODEL})…")
+    block_raw, usage_gen = _generate_block_from_facts(analysis, block, facts_raw, sources, GENERATE_MODEL)
     cost_gen = estimate_cost(usage_gen, model)
     total_cost += cost_gen
     for k, v in usage_gen.items():
