@@ -369,6 +369,14 @@ const SECTIONS = [
   { key: 'geo', label: 'GEO / SEO' },
 ];
 
+// Search queries per block (from blocks_config.py search_queries field)
+const BLOCK_QUERIES = {
+  44: [
+    '{analysis} что показывает анализ описание',
+    '{analysis} анализ крови для чего назначают',
+  ],
+};
+
 // Descriptions per block (from blocks_config.py)
 const BLOCK_DESC = {
   1:  'Первый абзац страницы. 2–3 предложения: что это, зачем делается, кому назначают, какова норма. Самодостаточный ответ — LLM и поисковик вырежет именно его.',
@@ -457,11 +465,11 @@ function initBlockChecklist() {
       const infoBtn = hasDesc
         ? `<button class="info-btn" data-id="${b.id}" onclick="showInfo(event,${b.id})" title="Описание блока">i</button>`
         : `<span style="width:16px;flex-shrink:0"></span>`;
-      html += `<label style="display:flex;align-items:center;gap:6px;padding:4px 16px;cursor:pointer;font-size:13px;color:var(--text2);line-height:1.3">
+      html += `<label style="display:flex;align-items:center;gap:6px;padding:4px 12px 4px 16px;cursor:pointer;font-size:13px;color:var(--text2);line-height:1.3">
         <input type="checkbox" data-block="${b.id}" style="width:14px;height:14px;accent-color:var(--accent);flex-shrink:0" checked />
-        ${infoBtn}
-        <span style="color:var(--muted);font-family:var(--mono);font-size:11px;flex-shrink:0">${b.id}</span>
+        <span style="color:var(--muted);font-family:var(--mono);font-size:11px;flex-shrink:0;min-width:20px">${b.id}</span>
         <span style="flex:1">${esc(b.name)}</span>
+        ${infoBtn}
       </label>`;
     });
   });
@@ -484,14 +492,23 @@ function showInfo(e, id) {
   const b = ALL_BLOCKS.find(x => x.id === id);
   const desc = BLOCK_DESC[id] || '';
   const sectionLabel = { b2c:'B2C', b2b:'B2B', geo:'GEO' }[b.section] || b.section;
+  const queries = BLOCK_QUERIES[id] || [];
+  const queriesHtml = queries.length
+    ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:5px">Serper-запросы</div>
+         ${queries.map(q => `<div style="font-size:12px;font-family:var(--mono);color:var(--blue);padding:2px 0">${esc(q)}</div>`).join('')}
+       </div>`
+    : '';
   _popup.innerHTML = `
     <div class="info-popup-section">${sectionLabel} · блок ${id}</div>
     <div class="info-popup-title">${esc(b.name)}</div>
-    <div>${esc(desc)}</div>
+    <div style="margin-top:4px">${esc(desc)}</div>
+    ${queriesHtml}
   `;
   const rect = e.target.getBoundingClientRect();
-  _popup.style.top  = (rect.bottom + 6) + 'px';
-  _popup.style.left = Math.min(rect.left, window.innerWidth - 320) + 'px';
+  const top = Math.min(rect.top, window.innerHeight - 220);
+  _popup.style.top  = top + 'px';
+  _popup.style.left = (rect.right + 8) + 'px';
   _popup.classList.add('visible');
 }
 
