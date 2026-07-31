@@ -140,11 +140,7 @@ def parse_response(raw: str, analysis: str, block_ids: list | None = None) -> di
 
 def _extract_field(text: str, field: str) -> str:
     """Extract multi-line field value (everything between field: and next KEYWORD:)."""
-    pattern = re.compile(
-        rf"^{field}:\s*\n(.*?)(?=^(?:BLOCK|CONTENT|CONFIDENCE|VERIFY):|$)",
-        re.MULTILINE | re.DOTALL,
-    )
-    m = pattern.search(text)
+    m = re.search(rf"{field}:\s*\n(.*?)(?=\n(?:BLOCK|CONTENT|CONFIDENCE|VERIFY):|$)", text, re.DOTALL)
     return m.group(1) if m else ""
 
 
