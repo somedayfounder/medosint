@@ -378,6 +378,11 @@ const BLOCK_QUERIES = {
   ],
 };
 
+// Models used in search-first pipeline per block (from pipeline.py)
+const BLOCK_MODELS = {
+  44: { extract: 'gemini-3.5-flash-lite', generate: 'gemini-3.6-flash' },
+};
+
 // Descriptions per block (from blocks_config.py)
 const BLOCK_DESC = {
   1:  'Первый абзац страницы. 2–3 предложения: что это, зачем делается, кому назначают, какова норма. Самодостаточный ответ — LLM и поисковик вырежет именно его.',
@@ -500,11 +505,20 @@ function showInfo(e, id) {
          ${queries.map(q => `<div style="font-size:12px;font-family:var(--mono);color:var(--blue);padding:2px 0">${esc(q)}</div>`).join('')}
        </div>`
     : '';
+  const models = BLOCK_MODELS[id];
+  const modelsHtml = models
+    ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:5px">Модели</div>
+         <div style="font-size:12px;color:var(--text2)"><span style="color:var(--muted)">extract</span> <span style="font-family:var(--mono)">${esc(models.extract)}</span></div>
+         <div style="font-size:12px;color:var(--text2);margin-top:2px"><span style="color:var(--muted)">generate</span> <span style="font-family:var(--mono)">${esc(models.generate)}</span></div>
+       </div>`
+    : '';
   _popup.innerHTML = `
     <div class="info-popup-section">${sectionLabel} · блок ${id}</div>
     <div class="info-popup-title">${esc(b.name)}</div>
     <div style="margin-top:4px">${esc(desc)}</div>
     ${queriesHtml}
+    ${modelsHtml}
   `;
   const rect = e.target.getBoundingClientRect();
   const top = Math.min(rect.top, window.innerHeight - 220);

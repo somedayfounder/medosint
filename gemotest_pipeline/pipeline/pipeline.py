@@ -28,7 +28,7 @@ def slugify(s: str) -> str:
 SEARCH_FIRST_BLOCKS = {44}
 
 # Models for search-first pipeline steps (fixed, independent of UI model selection)
-EXTRACT_MODEL  = "gemini-2.5-flash-lite"   # reads raw Tavily HTML, pulls out facts
+EXTRACT_MODEL  = "gemini-3.5-flash-lite"   # reads raw Tavily HTML, pulls out facts
 GENERATE_MODEL = "gemini-3.6-flash"         # writes the final block from clean facts
 
 
