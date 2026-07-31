@@ -306,6 +306,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
     <div class="tabs">
       <div class="tab active" id="tabBlocks" onclick="switchTab('blocks')">Блоки <span class="tab-badge" id="blocksBadge">0</span></div>
       <div class="tab" id="tabFacts" onclick="switchTab('facts')">Факты <span class="tab-badge" id="factsBadge">0</span></div>
+      <div class="tab" id="tabRefs" onclick="switchTab('refs')">Источники <span class="tab-badge" id="refsBadge">0</span></div>
       <div class="tab" id="tabLog" onclick="switchTab('log')">Log <span class="tab-badge" id="logBadge">0</span></div>
     </div>
 
@@ -324,6 +325,15 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
       <div id="factsContent" style="padding:16px;overflow-y:auto;flex:1">
         <div style="font-size:13px;color:var(--muted);text-align:center;padding-top:40px">
           Факты появятся здесь после запуска поискового пайплайна.
+        </div>
+      </div>
+    </div>
+
+    <!-- Источники -->
+    <div class="tab-pane" id="refsPane">
+      <div id="refsContent" style="padding:16px;overflow-y:auto;flex:1">
+        <div style="font-size:13px;color:var(--muted);text-align:center;padding-top:40px">
+          Академические источники появятся здесь после запуска поискового пайплайна.
         </div>
       </div>
     </div>
@@ -671,7 +681,7 @@ function slugify(s) {
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab) {
-  ['blocks', 'facts', 'log'].forEach(t => {
+  ['blocks', 'facts', 'refs', 'log'].forEach(t => {
     document.getElementById('tab' + t[0].toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
     document.getElementById(t + 'Pane').classList.toggle('active', t === tab);
   });
@@ -824,6 +834,63 @@ function renderResult(data) {
 
   document.getElementById('blocksBadge').textContent = blocksFilled;
   renderProgress(data.stats);
+  renderFactsFromResult(data);
+  renderRefsFromResult(data);
+}
+
+function renderFactsFromResult(data) {
+  const blocks = Object.values(data.blocks || {}).filter(b => b.extracted_facts);
+  const el = document.getElementById('factsContent');
+  if (!el) return;
+  if (!blocks.length) return;
+
+  blocks.sort((a, b) => a.id - b.id);
+  const html = blocks.map(b => {
+    const queries = (b.search_queries || []).map(q =>
+      `<span style="display:inline-block;font-size:11px;font-family:var(--mono);background:var(--surface2);border-radius:4px;padding:2px 6px;margin:2px 3px 2px 0;color:var(--blue)">${esc(q)}</span>`
+    ).join('');
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:6px">
+        Блок ${b.id} · ${esc(b.name)}
+      </div>
+      ${queries ? `<div style="margin-bottom:8px">${queries}</div>` : ''}
+      <div style="font-size:13px;color:var(--text2);white-space:pre-wrap;line-height:1.6">${esc(b.extracted_facts)}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = html;
+  const badge = document.getElementById('factsBadge');
+  if (badge) badge.textContent = blocks.length;
+}
+
+function renderRefsFromResult(data) {
+  const el = document.getElementById('refsContent');
+  if (!el) return;
+
+  // Collect refs from extracted_refs (new runs) or none (old runs)
+  const seen = new Set();
+  const allRefs = [];
+  Object.values(data.blocks || {}).forEach(b => {
+    (b.extracted_refs || []).forEach(r => {
+      const key = r.toLowerCase().slice(0, 60);
+      if (!seen.has(key)) { seen.add(key); allRefs.push(r); }
+    });
+  });
+
+  if (!allRefs.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding-top:40px">Академических источников не найдено.<br><span style="font-size:12px">Появятся после следующего запуска с поиском.</span></div>';
+    return;
+  }
+
+  el.innerHTML = allRefs.map((r, i) =>
+    `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+       <span style="font-size:12px;color:var(--muted);min-width:24px;text-align:right;font-variant-numeric:tabular-nums">${i+1}</span>
+       <span style="font-size:13px;color:var(--text2);line-height:1.5">${esc(r)}</span>
+     </div>`
+  ).join('');
+
+  const badge = document.getElementById('refsBadge');
+  if (badge) badge.textContent = allRefs.length;
 }
 
 function renderProgress(stats) {
