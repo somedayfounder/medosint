@@ -305,6 +305,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
     </div>
     <div class="tabs">
       <div class="tab active" id="tabBlocks" onclick="switchTab('blocks')">Блоки <span class="tab-badge" id="blocksBadge">0</span></div>
+      <div class="tab" id="tabFacts" onclick="switchTab('facts')">Факты <span class="tab-badge" id="factsBadge">0</span></div>
       <div class="tab" id="tabLog" onclick="switchTab('log')">Log <span class="tab-badge" id="logBadge">0</span></div>
     </div>
 
@@ -314,6 +315,15 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
         <div class="waiting-state" id="waitingState">
           <div class="big">🧪</div>
           <p>Введите название анализа и нажмите <strong>Запустить</strong>.<br>Блоки появятся здесь когда GitHub Actions завершит работу (~2–3 мин).</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Факты -->
+    <div class="tab-pane" id="factsPane">
+      <div id="factsContent" style="padding:16px;overflow-y:auto;flex:1">
+        <div style="font-size:13px;color:var(--muted);text-align:center;padding-top:40px">
+          Факты появятся здесь после запуска поискового пайплайна.
         </div>
       </div>
     </div>
@@ -661,7 +671,7 @@ function slugify(s) {
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab) {
-  ['blocks', 'log'].forEach(t => {
+  ['blocks', 'facts', 'log'].forEach(t => {
     document.getElementById('tab' + t[0].toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
     document.getElementById(t + 'Pane').classList.toggle('active', t === tab);
   });
@@ -928,6 +938,8 @@ async function poll() {
         addLog('step', 'Actions: in_progress');
         lastLoggedStatus = 'in_progress';
       }
+      // Refresh facts cache live while pipeline runs (blocks commit incrementally)
+      if (currentAnalysis) loadFactsCache(currentAnalysis);
       pollTimer = setTimeout(poll, 5000);
       return;
     }
@@ -974,6 +986,7 @@ async function loadResult(analysis) {
       renderResult(data);
       document.getElementById('runStatus').textContent = `✓ ${analysis} · ${Object.keys(data.blocks || {}).length} блоков`;
       addLog('done', `Загружено: ${url}`);
+      await loadFactsCache(analysis);
       return;
     } catch(e) {
       if (i < delays.length) {
@@ -984,6 +997,84 @@ async function loadResult(analysis) {
       }
     }
   }
+}
+
+// ── Facts cache ───────────────────────────────────────────────────────────────
+async function loadFactsCache(analysis) {
+  const slug = slugify(analysis);
+  const url = `results/${slug}_facts.json`;
+  try {
+    const r = await fetch(url + '?t=' + Date.now());
+    if (!r.ok) return;
+    const data = await r.json();
+    renderFactsCache(data);
+  } catch(e) {
+    // Facts cache not available yet — silent
+  }
+}
+
+function renderFactsCache(data) {
+  const el = document.getElementById('factsContent');
+  if (!el) return;
+
+  const entries = Object.entries(data).filter(([k]) => !['analysis', 'updated_at'].includes(k));
+  if (!entries.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding-top:40px">Фактов пока нет.</div>';
+    return;
+  }
+
+  const updatedAt = data.updated_at
+    ? `<div style="font-size:11px;color:var(--muted);margin-bottom:14px">Обновлено: ${new Date(data.updated_at).toLocaleString('ru')}</div>`
+    : '';
+
+  const blocksHtml = entries.sort((a,b) => Number(a[0]) - Number(b[0])).map(([bid, entry]) => {
+    const facts = (entry.facts || '').trim();
+    const refs = entry.refs || [];
+    const queries = entry.queries || [];
+    const sources = entry.sources || [];
+
+    const queriesHtml = queries.length
+      ? `<div style="margin-bottom:8px">${queries.map(q =>
+          `<span style="display:inline-block;font-size:11px;font-family:var(--mono);background:var(--surface2);border-radius:4px;padding:2px 6px;margin:2px 3px 2px 0;color:var(--blue)">${esc(q)}</span>`
+        ).join('')}</div>`
+      : '';
+
+    const factsHtml = facts
+      ? `<div style="font-size:13px;color:var(--text2);white-space:pre-wrap;line-height:1.6;margin-bottom:10px">${esc(facts)}</div>`
+      : '<div style="font-size:12px;color:var(--muted)">—</div>';
+
+    const refsHtml = refs.length
+      ? `<details style="margin-top:8px">
+           <summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);list-style:none">
+             ▸ Источники из текста · ${refs.length}
+           </summary>
+           <div style="margin-top:6px">${refs.map(r =>
+             `<div style="font-size:12px;color:var(--text2);padding:2px 0;border-left:2px solid var(--border);padding-left:8px;margin-bottom:4px">${esc(r)}</div>`
+           ).join('')}</div>
+         </details>`
+      : '';
+
+    const sourcesHtml = sources.length
+      ? `<div style="margin-top:6px">${sources.map(s =>
+          `<a href="${esc(s)}" target="_blank" style="display:block;font-size:11px;color:var(--blue);word-break:break-all;margin:1px 0">${esc(s.length > 80 ? s.slice(0,80)+'…' : s)}</a>`
+        ).join('')}</div>`
+      : '';
+
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:6px">
+        Блок ${bid} · ${esc(entry.block_name || '')}
+      </div>
+      ${queriesHtml}
+      ${factsHtml}
+      ${refsHtml}
+      ${sourcesHtml}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = updatedAt + blocksHtml;
+
+  const badge = document.getElementById('factsBadge');
+  if (badge) badge.textContent = entries.length;
 }
 
 // ── History ───────────────────────────────────────────────────────────────────

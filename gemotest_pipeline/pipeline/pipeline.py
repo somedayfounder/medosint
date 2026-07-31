@@ -33,8 +33,27 @@ EXTRACT_MODEL  = "gemini-3.5-flash-lite"   # reads raw Tavily HTML, pulls out fa
 GENERATE_MODEL = "gemini-3.6-flash"         # writes the final block from clean facts
 
 
-def _extract_facts_from_sources(analysis: str, block: dict, sources: list[dict]) -> tuple[str, dict]:
-    """Lite model: read raw Tavily content, extract only relevant facts for this block."""
+def _parse_facts_refs(raw: str) -> tuple[str, list[str]]:
+    """Split extraction output into facts block and bibliography list."""
+    refs_section = ""
+    facts_section = raw
+
+    m = re.search(r'\nИСТОЧНИКИ[:\s]*\n(.*)', raw, re.DOTALL | re.IGNORECASE)
+    if m:
+        facts_section = raw[:m.start()].strip()
+        refs_section = m.group(1).strip()
+
+    refs = []
+    for line in refs_section.splitlines():
+        line = line.strip().lstrip('*-–').strip()
+        if len(line) > 20:
+            refs.append(line)
+
+    return facts_section.strip(), refs
+
+
+def _extract_facts_from_sources(analysis: str, block: dict, sources: list[dict]) -> tuple[str, list[str], dict]:
+    """Lite model: read raw Tavily content, extract facts and bibliography."""
     raw_pages = "\n\n---\n\n".join(
         f"URL: {s['url']}\nЗаголовок: {s['title']}\n\n{s['content']}"
         for s in sources
@@ -45,11 +64,19 @@ def _extract_facts_from_sources(analysis: str, block: dict, sources: list[dict])
         f"Описание блока: {block['description']}\n\n"
         f"Из текста ниже извлеки ВСЕ факты, релевантные для этого блока.\n"
         f"Убери только навигацию, рекламу и полные дубли.\n"
-        f"Верни подробный список фактов — по одному факту на строку, начиная с «* ».\n"
         f"Чем больше полезных фактов — тем лучше. Не сокращай без необходимости.\n\n"
+        f"Также собери все академические источники, которые встретятся в тексте "
+        f"(раздел «Источники», «Литература», «References» и т.п.) — "
+        f"авторы, название, год, издание.\n\n"
+        f"Верни ответ строго в двух разделах:\n"
+        f"ФАКТЫ:\n* факт 1\n* факт 2\n...\n\n"
+        f"ИСТОЧНИКИ:\n* автор, название, год\n...\n\n"
+        f"Если источников нет — раздел ИСТОЧНИКИ оставь пустым, но заголовок напиши.\n\n"
         f"Страницы:\n{raw_pages}"
     )
-    return call_gemini(prompt, EXTRACT_MODEL)
+    raw, usage = call_gemini(prompt, EXTRACT_MODEL)
+    facts, refs = _parse_facts_refs(raw)
+    return facts, refs, usage
 
 
 def _generate_block_from_facts(analysis: str, block: dict, facts: str, sources: list[dict], model: str) -> tuple[str, dict]:
@@ -92,12 +119,12 @@ def run_block_search_first(analysis: str, block_id: int, model: str, blocks: dic
 
     # Step 3 — lite model extracts relevant facts from raw HTML
     print(f"[search-first] Извлекаем факты ({EXTRACT_MODEL})…")
-    facts_raw, usage_extract = _extract_facts_from_sources(analysis, block, sources)
+    facts_raw, extracted_refs, usage_extract = _extract_facts_from_sources(analysis, block, sources)
     cost_extract = estimate_cost(usage_extract, EXTRACT_MODEL)
     total_cost += cost_extract
     for k, v in usage_extract.items():
         total_usage[k] = total_usage.get(k, 0) + v
-    print(f"[search-first] Факты: {len(facts_raw)} символов, стоимость: ${cost_extract:.6f}")
+    print(f"[search-first] Факты: {len(facts_raw)} символов, источников: {len(extracted_refs)}, стоимость: ${cost_extract:.6f}")
 
     # Step 4 — strong model writes the block from clean facts
     print(f"[search-first] Генерируем блок ({GENERATE_MODEL})…")
@@ -125,6 +152,7 @@ def run_block_search_first(analysis: str, block_id: int, model: str, blocks: dic
             for s in sources
         ],
         "extracted_facts": facts_raw.strip(),
+        "extracted_refs":  extracted_refs,
         "warnings":       [],
         "fact_cards":     [],
         "verify_queries": [q.format(analysis=analysis) for q in block.get("verify_queries", [])],
@@ -133,12 +161,53 @@ def run_block_search_first(analysis: str, block_id: int, model: str, blocks: dic
     }
 
 
+def _load_facts_cache(out_dir: Path, slug: str) -> dict:
+    """Load previously extracted facts for this analysis."""
+    path = out_dir / f"{slug}_facts.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except Exception:
+            pass
+    return {}
+
+
+def _save_facts_cache(out_dir: Path, slug: str, analysis: str, cache: dict):
+    path = out_dir / f"{slug}_facts.json"
+    cache["analysis"] = analysis
+    cache["updated_at"] = datetime.utcnow().isoformat() + "Z"
+    path.write_text(json.dumps(cache, ensure_ascii=False, indent=2))
+
+
+def _build_cached_facts_context(cache: dict, exclude_block_id: int) -> str:
+    """Build a context string from all cached facts except the current block."""
+    parts = []
+    for bid_str, entry in cache.items():
+        if bid_str in ("analysis", "updated_at"):
+            continue
+        if int(bid_str) == exclude_block_id:
+            continue
+        name = entry.get("block_name", f"Блок {bid_str}")
+        facts = entry.get("facts", "").strip()
+        if facts:
+            parts.append(f"[{name}]\n{facts}")
+    return "\n\n".join(parts)
+
+
 def run(analysis: str, block_ids: list | None, model: str, out_dir: Path, blocks: dict | None = None):
     blocks = blocks or BLOCKS
     print(f"[pipeline] Анализ: {analysis}")
     print(f"[pipeline] Блоки: {block_ids or 'все'}")
     print(f"[pipeline] Модель: {model}")
     print(f"[pipeline] SEO ТЗ: {'да' if blocks is not BLOCKS else 'нет'}")
+
+    slug = slugify(analysis)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load accumulated facts from previous runs of this analysis
+    facts_cache = _load_facts_cache(out_dir, slug)
+    if facts_cache:
+        print(f"[pipeline] Кэш фактов: {len([k for k in facts_cache if k not in ('analysis','updated_at')])} блоков")
 
     target = set(block_ids) if block_ids else set(blocks.keys())
     search_ids = target & SEARCH_FIRST_BLOCKS
@@ -160,11 +229,26 @@ def run(analysis: str, block_ids: list | None, model: str, out_dir: Path, blocks
             total_usage[k] = total_usage.get(k, 0) + v
         all_blocks[bid] = result
 
+        # Save extracted facts and bibliography to cache immediately after each block
+        facts_cache[str(bid)] = {
+            "block_name": result["name"],
+            "queries":    result.get("search_queries", []),
+            "sources":    result.get("sources", []),
+            "facts":      result.get("extracted_facts", ""),
+            "refs":       result.get("extracted_refs", []),
+        }
+        _save_facts_cache(out_dir, slug, analysis, facts_cache)
+        n_refs = len(result.get("extracted_refs", []))
+        print(f"[pipeline] Факты блока {bid} сохранены в кэш (+ {n_refs} источников)")
+
     # ── LLM-only blocks ───────────────────────────────────────────────────────
     llm_id_list = [bid for bid in llm_ids if bid in blocks]
     if llm_id_list:
         print(f"[pipeline] LLM блоки: {llm_id_list}")
-        prompt = build_prompt(analysis, llm_id_list, blocks)
+        cached_context = _build_cached_facts_context(facts_cache, exclude_block_id=-1)
+        prompt = build_prompt(analysis, llm_id_list, blocks, cached_facts=cached_context)
+        if cached_context:
+            print(f"[pipeline] Инжектирован кэш фактов: {len(cached_context)} символов")
         print(f"[pipeline] Промпт: {len(prompt)} символов")
         print("[pipeline] Вызываем Gemini…")
         raw, usage = call_gemini(prompt, model)
@@ -179,8 +263,6 @@ def run(analysis: str, block_ids: list | None, model: str, out_dir: Path, blocks
 
     print(f"[pipeline] Итого блоков: {len(all_blocks)}, стоимость: ${total_cost:.6f}")
 
-    slug = slugify(analysis)
-    out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{slug}.json"
 
     # Merge with existing result when running partial blocks

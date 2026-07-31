@@ -16,7 +16,7 @@ def _configure():
     genai.configure(api_key=api_key)
 
 
-def build_prompt(analysis: str, block_ids: list | None = None, blocks: dict | None = None) -> str:
+def build_prompt(analysis: str, block_ids: list | None = None, blocks: dict | None = None, cached_facts: str = "") -> str:
     """Build the multi-pass prompt for all requested blocks."""
     blocks = blocks or BLOCKS
     target = set(block_ids) if block_ids else None
@@ -52,6 +52,14 @@ def build_prompt(analysis: str, block_ids: list | None = None, blocks: dict | No
 
         passes.append("\n".join(lines))
 
+    facts_section = ""
+    if cached_facts:
+        facts_section = (
+            "\n\nФАКТЫ ИЗ ВЕБА (извлечены поисковым пайплайном для этого анализа):\n"
+            "Используй эти факты как дополнительный контекст при написании блоков.\n"
+            f"{cached_facts}\n"
+        )
+
     system = (
         f"Ты медицинский контент-редактор Гемотест. "
         f"Заполни все блоки для анализа: {analysis}\n\n"
@@ -62,6 +70,7 @@ def build_prompt(analysis: str, block_ids: list | None = None, blocks: dict | No
         "— Не добавляй вводных фраз («В данном блоке...», «Данный анализ...»)\n"
         "— Строго соблюдай формат: BLOCK: N / CONTENT: / CONFIDENCE: / VERIFY:\n"
         "— Не пропускай ни одного блока\n\n"
+        + facts_section
     )
 
     return system + "\n\n".join(passes)
