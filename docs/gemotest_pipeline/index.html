@@ -242,12 +242,8 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
       <label>Комплекс (опционально)</label>
       <input id="complexInput" type="text" placeholder="Т4св, АТ-ТПО" />
 
-      <label>Блоки (пусто = все)</label>
-      <input id="blocksInput" type="text" placeholder="1, 3, 44" />
-
       <label>Модель</label>
       <select id="modelSelect">
-        <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
         <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
         <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
         <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
@@ -256,13 +252,22 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
 
       <button class="btn-run" id="runBtn" onclick="startRun()">▶  Запустить</button>
       <button class="btn-stop" id="stopBtn" onclick="stopRun()" style="display:none">■  Отмена</button>
-
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px">Последние</div>
-        <div id="recentList"></div>
-      </div>
     </div>
 
+    <!-- Block checklist -->
+    <div style="flex:1;overflow-y:auto;border-top:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);flex:1">Блоки</span>
+        <button class="btn-xs" onclick="selectAllBlocks()">Все</button>
+        <button class="btn-xs" onclick="clearBlocks()">Сброс</button>
+      </div>
+      <div id="blockChecklist" style="padding:8px 0"></div>
+    </div>
+
+    <div style="padding:12px 16px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px">Последние</div>
+      <div id="recentList"></div>
+    </div>
   </div>
 
   <!-- ── CENTER ── -->
@@ -345,6 +350,73 @@ const SECTIONS = [
   { key: 'b2b', label: 'B2B — Для врача' },
   { key: 'geo', label: 'GEO / SEO' },
 ];
+
+// All 28 LLM blocks grouped by section
+const ALL_BLOCKS = [
+  { id:1,  name:'Прямой ответ (Citation Bait)',     section:'b2c' },
+  { id:2,  name:'Ключевые факты (карточка)',         section:'b2c' },
+  { id:3,  name:'Нормы',                             section:'b2c' },
+  { id:4,  name:'При каких жалобах назначают',       section:'b2c' },
+  { id:5,  name:'Интерпретация с градациями',        section:'b2c' },
+  { id:6,  name:'Подготовка (FAQ-формат)',            section:'b2c' },
+  { id:7,  name:'FAQ — вопросы пациентов',           section:'b2c' },
+  { id:8,  name:'Мифы и заблуждения',               section:'b2c' },
+  { id:9,  name:'Лекарства (таблица)',               section:'b2c' },
+  { id:10, name:'Сравнение с похожими анализами',   section:'b2c' },
+  { id:11, name:'Путь пациента',                    section:'b2c' },
+  { id:12, name:'Особенности для групп',            section:'b2c' },
+  { id:15, name:'Связанные анализы',                section:'b2c' },
+  { id:34, name:'Процесс сдачи',                    section:'b2c' },
+  { id:40, name:'Противопоказания',                 section:'b2c' },
+  { id:44, name:'Краткое описание (hook)',           section:'b2c' },
+  { id:46, name:'Зачем сдавать (показания)',        section:'b2c' },
+  { id:24, name:'Методология',                      section:'b2b' },
+  { id:25, name:'Ограничения метода',               section:'b2b' },
+  { id:26, name:'Клиническое руководство',          section:'b2b' },
+  { id:27, name:'Требования к образцу',             section:'b2b' },
+  { id:16, name:'Цитируемые факты',                 section:'b2b' },
+  { id:32, name:'Полное описание',                  section:'geo' },
+  { id:33, name:'Синонимы',                         section:'geo' },
+  { id:17, name:'Источники',                        section:'geo' },
+  { id:18, name:'Meta description',                 section:'geo' },
+  { id:19, name:'Schema markup',                    section:'geo' },
+  { id:20, name:'H1 / Title варианты',              section:'geo' },
+];
+
+function initBlockChecklist() {
+  const el = document.getElementById('blockChecklist');
+  let html = '';
+  const groups = [
+    { key: 'b2c', label: 'B2C' },
+    { key: 'b2b', label: 'B2B' },
+    { key: 'geo', label: 'GEO' },
+  ];
+  groups.forEach(g => {
+    const blocks = ALL_BLOCKS.filter(b => b.section === g.key);
+    html += `<div style="padding:6px 16px 2px;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;text-transform:uppercase">${g.label}</div>`;
+    blocks.forEach(b => {
+      html += `<label style="display:flex;align-items:center;gap:8px;padding:4px 16px;cursor:pointer;font-size:13px;color:var(--text2);line-height:1.3">
+        <input type="checkbox" data-block="${b.id}" style="width:14px;height:14px;accent-color:var(--accent);flex-shrink:0" />
+        <span style="color:var(--muted);font-family:var(--mono);font-size:11px;flex-shrink:0">${b.id}</span>
+        ${esc(b.name)}
+      </label>`;
+    });
+  });
+  el.innerHTML = html;
+}
+
+function getSelectedBlocks() {
+  return [...document.querySelectorAll('#blockChecklist input[type=checkbox]:checked')]
+    .map(cb => cb.dataset.block).join(',');
+}
+
+function selectAllBlocks() {
+  document.querySelectorAll('#blockChecklist input[type=checkbox]').forEach(cb => cb.checked = true);
+}
+
+function clearBlocks() {
+  document.querySelectorAll('#blockChecklist input[type=checkbox]').forEach(cb => cb.checked = false);
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let logCount = 0, autoScroll = true;
@@ -699,7 +771,7 @@ async function startRun() {
   const ok = await triggerWorkflow({
     analysis_name:  analysis,
     complex_names:  document.getElementById('complexInput').value.trim(),
-    blocks:         document.getElementById('blocksInput').value.trim(),
+    blocks:         getSelectedBlocks(),
     model:          document.getElementById('modelSelect').value,
   });
 
@@ -744,6 +816,7 @@ function esc(s)      { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadSettings();
 renderHistory();
+initBlockChecklist();
 </script>
 </body>
 </html>
