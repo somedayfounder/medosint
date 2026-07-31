@@ -260,13 +260,6 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
       </div>
     </div>
 
-    <!-- Worker URL (no token needed in browser) -->
-    <div class="settings-section">
-      <label>Worker URL</label>
-      <input id="workerInput" type="text" placeholder="https://gemotest-trigger.xxx.workers.dev" />
-      <button class="btn-save-token" onclick="saveWorker()">Сохранить</button>
-      <div class="token-status" id="tokenStatus">✓ Сохранено</div>
-    </div>
   </div>
 
   <!-- ── CENTER ── -->
@@ -343,7 +336,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const WORKER_URL = () => localStorage.getItem('worker_url') || '';
+const WORKER_URL = () => 'https://weathered-math-5be7.aliaksandrpaltaratski.workers.dev';
 const SECTIONS = [
   { key: 'b2c', label: 'B2C — Для пациента' },
   { key: 'b2b', label: 'B2B — Для врача' },
@@ -682,7 +675,6 @@ async function openResult(analysis) {
 async function startRun() {
   const analysis = document.getElementById('analysisInput').value.trim();
   if (!analysis) { alert('Введите название анализа'); return; }
-  if (!WORKER_URL()) { alert('Добавьте Worker URL в настройках внизу'); return; }
 
   currentAnalysis = analysis;
   currentRunId    = null;
