@@ -192,7 +192,7 @@ def main():
     parser = argparse.ArgumentParser(description="Gemotest pipeline")
     parser.add_argument("--analysis", required=True, help="Название анализа")
     parser.add_argument("--blocks", default="", help="ID блоков через запятую (пусто = все)")
-    parser.add_argument("--model", default="gemini-2.0-flash")
+    parser.add_argument("--model", default="gemini-2.0-flash", help="Модель для LLM-only блоков")
     parser.add_argument("--out-dir", default=None, help="Папка для результатов")
     args = parser.parse_args()
 

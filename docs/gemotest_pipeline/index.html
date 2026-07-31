@@ -260,14 +260,6 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); min-hei
       <label>Анализ</label>
       <input id="analysisInput" type="text" placeholder="напр. ТТГ" />
 
-      <label>Модель</label>
-      <select id="modelSelect">
-        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-        <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash (preview)</option>
-        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-      </select>
-
       <button class="btn-run" id="runBtn" onclick="startRun()">▶  Запустить</button>
       <button class="btn-stop" id="stopBtn" onclick="stopRun()" style="display:none">■  Отмена</button>
     </div>
@@ -893,10 +885,8 @@ async function startRun() {
   addLog('start', `▶ ${analysis}`);
 
   const ok = await triggerWorkflow({
-    analysis_name:  analysis,
-
-    blocks:         getSelectedBlocks(),
-    model:          document.getElementById('modelSelect').value,
+    analysis_name: analysis,
+    blocks:        getSelectedBlocks(),
   });
 
   if (!ok) {

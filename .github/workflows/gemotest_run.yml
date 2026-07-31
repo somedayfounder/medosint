@@ -10,10 +10,6 @@ on:
         description: "ID блоков через запятую (пусто = все)"
         required: false
         default: ""
-      model:
-        description: "Модель Gemini"
-        required: false
-        default: "gemini-1.5-flash"
 
 jobs:
   run:
@@ -39,8 +35,7 @@ jobs:
         run: |
           python -m gemotest_pipeline.pipeline.pipeline \
             --analysis "${{ inputs.analysis_name }}" \
-            --blocks "${{ inputs.blocks }}" \
-            --model "${{ inputs.model }}"
+            --blocks "${{ inputs.blocks }}"
 
       - name: Commit result
         run: |
