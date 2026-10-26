@@ -30,3 +30,4 @@ venv/
 # Local docs / plans (not for repo)
 *.md
 !sf_pipeline/static/*.md
+!blocks_full.md
